@@ -29,7 +29,7 @@
     "test": "vp test",
     "check": "vp check",
     "prepublishOnly": "vp run build",
-    "play": "vp playground"
+    "play": "vp dev"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
