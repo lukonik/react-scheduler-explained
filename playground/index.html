@@ -3,10 +3,551 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>React Scheduler Internal Playground</title>
+    <title>React Scheduler — Why It Matters</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0d0f17;
+        --surface: #13161f;
+        --surface2: #1b1f2e;
+        --border: #272b3d;
+        --text: #e2e8f0;
+        --muted: #7c8db5;
+        --accent-green: #22d3a5;
+        --accent-red: #f4606c;
+        --accent-blue: #6c8ef4;
+        --accent-purple: #b06cf4;
+        --ball-smooth: #22d3a5;
+        --ball-janky: #f4606c;
+        --glow-green: 0 0 20px rgba(34, 211, 165, 0.35);
+        --glow-red: 0 0 20px rgba(244, 96, 108, 0.35);
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Inter", sans-serif;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 40px 20px 80px;
+        gap: 40px;
+      }
+
+      /* ── Header ── */
+      header {
+        text-align: center;
+        max-width: 680px;
+      }
+
+      .badge {
+        display: inline-block;
+        background: linear-gradient(135deg, #272b3d, #1b1f2e);
+        border: 1px solid var(--border);
+        border-radius: 100px;
+        padding: 4px 14px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--accent-blue);
+        margin-bottom: 18px;
+      }
+
+      h1 {
+        font-size: clamp(26px, 4vw, 42px);
+        font-weight: 700;
+        line-height: 1.2;
+        background: linear-gradient(135deg, #e2e8f0 30%, #7c8db5);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 14px;
+      }
+
+      header p {
+        font-size: 15px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      /* ── Demos grid ── */
+      .demos {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        width: 100%;
+        max-width: 1100px;
+      }
+
+      @media (max-width: 780px) {
+        .demos {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* ── Card ── */
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 28px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        position: relative;
+        overflow: hidden;
+        transition: border-color 0.3s;
+      }
+
+      .card.smooth {
+        border-color: rgba(34, 211, 165, 0.25);
+      }
+      .card.janky {
+        border-color: rgba(244, 96, 108, 0.25);
+      }
+
+      .card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: 20px;
+        opacity: 0.04;
+        pointer-events: none;
+      }
+      .card.smooth::before {
+        background: radial-gradient(circle at top left, #22d3a5, transparent 60%);
+        opacity: 0.08;
+      }
+      .card.janky::before {
+        background: radial-gradient(circle at top left, #f4606c, transparent 60%);
+        opacity: 0.08;
+      }
+
+      .card-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 12px;
+        border-radius: 100px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .pill.green {
+        background: rgba(34, 211, 165, 0.12);
+        color: var(--accent-green);
+        border: 1px solid rgba(34, 211, 165, 0.25);
+      }
+      .pill.red {
+        background: rgba(244, 96, 108, 0.12);
+        color: var(--accent-red);
+        border: 1px solid rgba(244, 96, 108, 0.25);
+      }
+
+      .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+
+      .card-title {
+        font-size: 17px;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .card-subtitle {
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.6;
+        flex: 1;
+      }
+
+      /* ── Canvas ── */
+      .canvas-wrap {
+        position: relative;
+        border-radius: 14px;
+        overflow: hidden;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        height: 180px;
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      /* ── Stats bar ── */
+      .stats {
+        display: flex;
+        gap: 16px;
+      }
+
+      .stat {
+        flex: 1;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .stat-label {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .stat-value {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text);
+        transition: color 0.3s;
+      }
+
+      .stat-value.green {
+        color: var(--accent-green);
+      }
+      .stat-value.red {
+        color: var(--accent-red);
+      }
+
+      /* ── Code snippet ── */
+      .code-block {
+        background: #0a0c13;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        line-height: 1.7;
+        overflow-x: auto;
+        color: #a8b3cf;
+      }
+
+      .code-block .kw {
+        color: #b06cf4;
+      }
+      .code-block .fn {
+        color: #6c8ef4;
+      }
+      .code-block .str {
+        color: #22d3a5;
+      }
+      .code-block .cmt {
+        color: #3d4563;
+      }
+      .code-block .num {
+        color: #f4c16c;
+      }
+
+      /* ── Button ── */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 11px 22px;
+        border-radius: 10px;
+        font-family: "Inter", sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition: all 0.2s;
+        width: 100%;
+        letter-spacing: 0.02em;
+      }
+
+      .btn-green {
+        background: linear-gradient(135deg, rgba(34, 211, 165, 0.15), rgba(34, 211, 165, 0.08));
+        border-color: rgba(34, 211, 165, 0.35);
+        color: var(--accent-green);
+      }
+      .btn-green:hover {
+        background: linear-gradient(135deg, rgba(34, 211, 165, 0.25), rgba(34, 211, 165, 0.14));
+        box-shadow: var(--glow-green);
+      }
+      .btn-green:active {
+        transform: scale(0.98);
+      }
+
+      .btn-red {
+        background: linear-gradient(135deg, rgba(244, 96, 108, 0.15), rgba(244, 96, 108, 0.08));
+        border-color: rgba(244, 96, 108, 0.35);
+        color: var(--accent-red);
+      }
+      .btn-red:hover {
+        background: linear-gradient(135deg, rgba(244, 96, 108, 0.25), rgba(244, 96, 108, 0.14));
+        box-shadow: var(--glow-red);
+      }
+      .btn-red:active {
+        transform: scale(0.98);
+      }
+
+      /* ── Explainer ── */
+      .explainer {
+        width: 100%;
+        max-width: 1100px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 32px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .explainer h2 {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+      }
+
+      .step {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .step-icon {
+        font-size: 22px;
+      }
+
+      .step h3 {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .step p {
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      /* ── Frame drop indicator ── */
+      @keyframes flash-red {
+        0%,
+        100% {
+          opacity: 0;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+
+      .jank-indicator {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        background: rgba(244, 96, 108, 0.2);
+        border: 1px solid rgba(244, 96, 108, 0.4);
+        border-radius: 100px;
+        padding: 3px 9px;
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--accent-red);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      .jank-indicator.visible {
+        animation: flash-red 0.6s ease-in-out;
+        opacity: 1;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <header>
+      <div class="badge">React Scheduler Internals</div>
+      <h1>Why the Scheduler Matters</h1>
+      <p>
+        Both demos bounce a ball and fire <strong>50,000 iterations</strong> of
+        heavy CPU work. Watch how <code>scheduleCallback</code> keeps the
+        animation silky-smooth by yielding to the browser, while the
+        synchronous version freezes your frame budget entirely.
+      </p>
+    </header>
+
+    <div class="demos">
+      <!-- ── SMOOTH ── -->
+      <div class="card smooth">
+        <div class="card-header">
+          <span class="pill green"><span class="dot"></span>scheduleCallback</span>
+        </div>
+        <div class="card-title">✅ With Scheduler</div>
+        <div class="card-subtitle">
+          Heavy work is broken into small chunks and scheduled via
+          <code>scheduleCallback(NormalPriority, …)</code>. The scheduler yields
+          every ~5 ms so rAF can fire and the animation never drops a frame.
+        </div>
+
+        <div class="canvas-wrap" id="smooth-wrap">
+          <canvas id="smooth-canvas"></canvas>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-label">Dropped Frames</div>
+            <div class="stat-value green" id="smooth-drops">0</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Work Items Done</div>
+            <div class="stat-value" id="smooth-items">0</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">FPS</div>
+            <div class="stat-value green" id="smooth-fps">—</div>
+          </div>
+        </div>
+
+        <div class="code-block">
+          <span class="kw">import</span> { scheduleCallback, NormalPriority }
+          <span class="kw">from</span>
+          <span class="str">"scheduler"</span>;<br /><br />
+          <span class="cmt">// Each chunk runs ≤ 5 ms then yields</span><br />
+          <span class="kw">function</span> <span class="fn">processChunk</span>() {<br />
+          &nbsp;&nbsp;<span class="kw">const</span> deadline =
+          <span class="fn">performance</span>.now() + <span class="num">5</span>;<br />
+          &nbsp;&nbsp;<span class="kw">while</span> (items.length &amp;&amp; performance.now() &lt; deadline) {<br />
+          &nbsp;&nbsp;&nbsp;&nbsp;<span class="fn">heavyItem</span>(items.<span class="fn">pop</span>());<br />
+          &nbsp;&nbsp;}<br />
+          &nbsp;&nbsp;<span class="kw">if</span> (items.length) <span class="fn">scheduleCallback</span>(<br />
+          &nbsp;&nbsp;&nbsp;&nbsp;NormalPriority, processChunk<br />
+          &nbsp;&nbsp;);<br />
+          }
+        </div>
+
+        <button class="btn btn-green" id="smooth-btn">▶ Run Heavy Work</button>
+      </div>
+
+      <!-- ── JANKY ── -->
+      <div class="card janky">
+        <div class="card-header">
+          <span class="pill red"><span class="dot"></span>Synchronous</span>
+        </div>
+        <div class="card-title">❌ Without Scheduler</div>
+        <div class="card-subtitle">
+          The same heavy work runs in one synchronous loop blocking the main
+          thread. The browser can't run <code>requestAnimationFrame</code> until
+          the loop finishes — causing visible freeze and dropped frames.
+        </div>
+
+        <div class="canvas-wrap" id="janky-wrap">
+          <canvas id="janky-canvas"></canvas>
+          <div class="jank-indicator" id="jank-indicator">Frame Drop!</div>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-label">Dropped Frames</div>
+            <div class="stat-value red" id="janky-drops">0</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Work Items Done</div>
+            <div class="stat-value" id="janky-items">0</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">FPS</div>
+            <div class="stat-value red" id="janky-fps">—</div>
+          </div>
+        </div>
+
+        <div class="code-block">
+          <span class="cmt">// ⚠ Blocks the main thread entirely</span><br />
+          <span class="kw">function</span> <span class="fn">processAllSync</span>() {<br />
+          &nbsp;&nbsp;<span class="kw">while</span> (items.length) {<br />
+          &nbsp;&nbsp;&nbsp;&nbsp;<span class="fn">heavyItem</span>(items.<span class="fn">pop</span>());<br />
+          &nbsp;&nbsp;}<br />
+          &nbsp;&nbsp;<span class="cmt">// Browser can't paint until this returns!</span><br />
+          }
+        </div>
+
+        <button class="btn btn-red" id="janky-btn">▶ Run Heavy Work</button>
+      </div>
+    </div>
+
+    <!-- ── Explainer ── -->
+    <div class="explainer">
+      <h2>🧠 How the Scheduler Prevents Jank</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step-icon">⏱️</div>
+          <h3>5 ms Time Slices</h3>
+          <p>
+            The scheduler checks <code>performance.now()</code> inside each
+            task. When 5 ms has elapsed it stops, schedules the remainder, and
+            returns control to the browser.
+          </p>
+        </div>
+        <div class="step">
+          <div class="step-icon">🎨</div>
+          <h3>rAF Can Fire</h3>
+          <p>
+            Because the main thread is free between slices,
+            <code>requestAnimationFrame</code> fires on schedule and the canvas
+            ball animates without interruption.
+          </p>
+        </div>
+        <div class="step">
+          <div class="step-icon">🚦</div>
+          <h3>Priority Lanes</h3>
+          <p>
+            <code>ImmediatePriority</code>, <code>UserBlockingPriority</code>,
+            <code>NormalPriority</code> — the scheduler picks the most urgent
+            task each slice, so user input is never starved.
+          </p>
+        </div>
+        <div class="step">
+          <div class="step-icon">📉</div>
+          <h3>No Scheduler = Jank</h3>
+          <p>
+            A plain <code>while</code> loop runs to completion before the event
+            loop can process paint, input or timers — you see a frozen UI.
+          </p>
+        </div>
+      </div>
+    </div>
+
     <script type="module" src="./index.ts"></script>
   </body>
 </html>
