@@ -1,15 +1,10 @@
-import { ImmediatePriority, unstable_scheduleCallback, UserBlockingPriority } from "../src/index";
-// export const NoPriority = 0;
-// export const ImmediatePriority = 1;
-// export const UserBlockingPriority = 2;
-// export const NormalPriority = 3;
-// export const LowPriority = 4;
-// export const IdlePriority = 5;
+import { ImmediatePriority,scheduleCallback, UserBlockingPriority } from "../src/index";
 
-unstable_scheduleCallback(UserBlockingPriority,()=>{
+
+scheduleCallback(UserBlockingPriority,()=>{
     console.log("BLOCK")
 })
 
-unstable_scheduleCallback(ImmediatePriority,()=>{
+scheduleCallback(ImmediatePriority,()=>{
     console.log("IMMEDIATE")
 })

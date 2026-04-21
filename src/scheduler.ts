@@ -193,7 +193,7 @@ function workLoop(initialTime: number) {
   }
 }
 
-function unstable_runWithPriority<T>(
+function runWithPriority<T>(
   priorityLevel: PriorityLevel,
   eventHandler: () => T,
 ): T {
@@ -218,7 +218,7 @@ function unstable_runWithPriority<T>(
   }
 }
 
-function unstable_next<T>(eventHandler: () => T): T {
+function next<T>(eventHandler: () => T): T {
   var priorityLevel: PriorityLevel;
   switch (currentPriorityLevel) {
     case ImmediatePriority:
@@ -243,7 +243,7 @@ function unstable_next<T>(eventHandler: () => T): T {
   }
 }
 
-function unstable_wrapCallback<T extends (...args: any[]) => any>(callback: T): T {
+function wrapCallback<T extends (...args: any[]) => any>(callback: T): T {
   const parentPriorityLevel = currentPriorityLevel;
 
   // We cast to T to ensure the return type matches the input type exactly
@@ -260,7 +260,7 @@ function unstable_wrapCallback<T extends (...args: any[]) => any>(callback: T): 
   } as T;
 }
 
-function unstable_scheduleCallback(
+function scheduleCallback(
   priorityLevel: PriorityLevel,
   callback: Callback,
   options?: {delay: number},
@@ -346,14 +346,14 @@ function unstable_scheduleCallback(
   return newTask;
 }
 
-function unstable_cancelCallback(task: Task) {
+function cancelCallback(task: Task) {
   // Null out the callback to indicate the task has been canceled. (Can't
   // remove from the queue because you can't remove arbitrary nodes from an
   // array based heap, only the first one.)
   task.callback = null;
 }
 
-function unstable_getCurrentPriorityLevel(): PriorityLevel {
+function getCurrentPriorityLevel(): PriorityLevel {
   return currentPriorityLevel;
 }
 
@@ -492,19 +492,19 @@ function cancelHostTimeout() {
 }
 
 export {
-  ImmediatePriority as unstable_ImmediatePriority,
-  UserBlockingPriority as unstable_UserBlockingPriority,
-  NormalPriority as unstable_NormalPriority,
-  IdlePriority as unstable_IdlePriority,
-  LowPriority as unstable_LowPriority,
-  unstable_runWithPriority,
-  unstable_next,
-  unstable_scheduleCallback,
-  unstable_cancelCallback,
-  unstable_wrapCallback,
-  unstable_getCurrentPriorityLevel,
-  shouldYieldToHost as unstable_shouldYield,
-  requestPaint as unstable_requestPaint,
-  getCurrentTime as unstable_now,
-  forceFrameRate as unstable_forceFrameRate,
+  ImmediatePriority as ImmediatePriority,
+  UserBlockingPriority as UserBlockingPriority,
+  NormalPriority as NormalPriority,
+  IdlePriority as IdlePriority,
+  LowPriority as LowPriority,
+  runWithPriority,
+  next,
+  scheduleCallback,
+  cancelCallback,
+  wrapCallback,
+  getCurrentPriorityLevel,
+  shouldYieldToHost as shouldYield,
+  requestPaint as requestPaint,
+  getCurrentTime as now,
+  forceFrameRate as forceFrameRate,
 };
