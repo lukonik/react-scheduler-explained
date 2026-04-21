@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "esnext",
-    "lib": ["es2023"],
+    "lib": ["es2023","DOM"],
     "moduleDetection": "force",
     "module": "nodenext",
     "moduleResolution": "nodenext",
@@ -10,6 +10,7 @@
     "strict": true,
     "noUnusedLocals": true,
     "declaration": true,
+    "noImplicitAny": false,
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "esModuleInterop": true,
