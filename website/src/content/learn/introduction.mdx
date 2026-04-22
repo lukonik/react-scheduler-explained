@@ -1,0 +1,12 @@
+---
+title: Introduction
+---
+
+# Introduction
+
+JavaScript is a single-threaded language, meaning code runs synchronously on a single thread.
+In addition to performing computations to keep the page smooth, the browser must render a frame every 16 milliseconds, leaving application code very little time to execute.
+From this perspective, React has roughly a 16 ms window to move from state A to state B on each update. This is rarely achievable in applications with thousands of nodes.
+The React Scheduler was designed to address this constraint. It queues tasks (work) and executes them efficiently without blocking the browser’s critical operations. It also prioritizes tasks so that more important ones run first.
+For example, a user scroll event handler can run before list items are rendered, even if the render was triggered earlier in the code. Both tasks cooperatively yield to the browser, allowing it to handle essential work and maintain a smooth user experience.
+In these chapters we will explore interesting techniques, how React team was able to break syncrhnoous nature of javascript and implement efficient task scheduler that can even be used without React in pure javascript.

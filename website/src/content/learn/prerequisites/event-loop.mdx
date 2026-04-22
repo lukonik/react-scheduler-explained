@@ -1,0 +1,27 @@
+---
+title: Event Loop
+---
+
+# Event Loop
+
+:::note
+This is a simplified explanation of the event loop, focused on what matters for the Scheduler. If you want a deeper dive, check out this excellent [video](https://www.youtube.com/watch?v=8aGhZQkoFbQ). Every second of it is worth watching.
+:::
+
+JavaScript runs on an event loop. When something happens—for example, a user clicks a button and a handler is attached—that handler is added to a queue. When the time comes, the browser executes it.
+
+The callback queue can contain different types of tasks, such as server response callbacks, `setTimeout` callbacks, and event handlers. The browser prioritizes these tasks and executes them sequentially.
+
+This model makes it possible to delay the execution of certain code. For example, imagine you need to perform a heavy computation on an array and also update a button’s background color. If you write:
+
+```js
+setButtonBackgroundColor()
+
+doHeavyComputation()
+```
+
+Even though the UI update comes first, it won’t be visible to the user immediately. Before the browser can repaint the frame, it must wait for your JavaScript to finish executing—meaning it has to complete `doHeavyComputation()`.
+
+A simple fix is to wrap `doHeavyComputation()` in `setTimeout`. This schedules the computation as a separate task, allowing the browser to first run `setButtonBackgroundColor()`, repaint the UI, and then execute the delayed computation on the next tick.
+
+In addition to `setTimeout`, there are other APIs that schedule callbacks at different stages of the event loop, such as `queueMicrotask`, `setImmediate`, and `BroadcastChannel.postMessage`. Depending on the situation, one may be more appropriate than the others.
