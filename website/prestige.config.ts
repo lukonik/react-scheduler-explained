@@ -43,6 +43,10 @@ export default defineConfig({
               label: "Queues",
               slug: "learn/schedulers/queues",
             },
+            {
+              label: "Task",
+              slug: "learn/schedulers/task",
+            },
           ],
         },
       ],
