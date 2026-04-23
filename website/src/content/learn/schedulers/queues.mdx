@@ -1,0 +1,57 @@
+---
+title: Queues
+---
+
+# Queue
+
+The main job scheduler does is it registers a function with predefined priority and executes it at a proper time. For example you can schedule callbacks like this:
+
+```ts
+scheduleCallback(UserBlockingPriority, () => {
+  someCOmputation1();
+});
+scheduleCallback(ImmediatePriority, () => {
+  someCOmputation2();
+});
+
+scheduleCallback(NormalPriority, () => {
+  someCOmputation3();
+});
+
+// Execute order
+// Immediate => UserBlocking => Normal
+
+```
+
+after this schedule will execute these callbacks sequentally with priority ordered and without sacrificing Browser Rendering. This functionality is crucial for React itself.
+React is built on Fiber tree (previously called Virtual DOM), that is in sync with what is rendered in DOM. and on every update new tree is built (with some share optimization) and compare with old Tree to propogate changes.
+This tree can hold thousands of nodes and the process can become costly for CPU and will block other processes to execute. To optimize it React uses Scheduler, to divide this whole work per chunks and use Scheduler to
+execute them efficiently. This single chunk of work is called a task in Reacts world.
+
+A task is an entity that holds multiple fields together mainly a callback function that needs to be executed and priorityLevel that pushes this callback in the Queue front or back
+
+The brief description of process looks like this:
+
+* React registers callback with priority in scheduler
+* React wraps the callback in tasks and adds it in task Queue and resortes the Quee to adjust newly added queue
+* when Scheduler pops this task when the computing resource is available and it is correct priority and executes it and removes this task from queue
+
+There are more nuances in the logic but this is the main part other nuances will be discussed later. This chapter discusses this flow in detail
+
+Task is the main entity that represents a function to execute, priorityLevel with additional fields. It is stored in Queue and executed by scheduler when the time is appropriate.
+There are two different task storages in scheduler the TasksQueue and TimersQueue. TaskQueue is the main Queue that are processed by scheduler all the time. The timersQueue is like 
+a wait queue the tasks are put there with specific delay and when time comes it will be moved to taskQueue to execute both of these queues are miniheaps that are adjusted to be usable with scheduler, both of the queues are identical they just differ
+in purpose.
+
+Queue source code are inside [mini-heap.ts](source-code) all the methods expect an array that will represent quue as I said there are two queues TaskQueue and TimersQueue both of them are declared in scheduler.js
+
+Let's examine Scheduler miniheap functions that will give us a picture how Queues are organized. Queue implements mini-heap data structure it expects array of Node. Node has two properties id,sortIndex. these two properties define
+Node A is greater then Node B in our case less value means higher priority so sortIndex 2 will execute before then sortIndex3.
+The current implementation of scheduler might cause to have duplicate sortIndex as wie will see later so to avoid collision the id is used which is unique value.
+The core behaviour is following. Node (Task) is pushed to array. Array is resorted first task in array is always the one with highest priority. so access has constant time.
+peek does exactly that
+pop returns the first item and resorts the queue
+siftdown and siftup are used to resort adding and removing items accordingly.
+comparefunction is to compare nodes for sorting.
+as you know Queues are mini-heap data structure that perfectly suits Scheudler purpose. THe node is extended to the task obbject with additional fields but 
+it doesn't effect the Quueue functionality Let's epxlore the task object
