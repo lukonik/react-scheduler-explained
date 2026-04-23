@@ -31,7 +31,6 @@ export type Task = {
   startTime: number,
   expirationTime: number,
   sortIndex: number,
-  isQueued?: boolean,
 };
 
 let getCurrentTime: () => number | DOMHighResTimeStamp;
