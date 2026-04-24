@@ -26,6 +26,27 @@ export default defineConfig({
               label: "Event Loop",
               slug: "learn/prerequisites/event-loop",
             },
+            {
+              label: "Mini Heap",
+              slug: "learn/prerequisites/mini-heap",
+            },
+          ],
+        },
+        {
+          label: "Scheduler",
+          items: [
+            {
+              label: "Scheduler",
+              slug: "learn/schedulers/scheduler",
+            },
+            {
+              label: "Queues",
+              slug: "learn/schedulers/queues",
+            },
+            {
+              label: "Task",
+              slug: "learn/schedulers/task",
+            },
           ],
         },
       ],
