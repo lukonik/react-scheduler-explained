@@ -1,0 +1,63 @@
+---
+    title: Timer Queue
+---
+
+# Timer Queue
+
+TimerQueue is a waiting queue, the tasks are added to the timerQueue, 
+and when time comes they are moved to the tasksQueue to be executed.
+Let's look in deep it how it works
+
+TimersQueue is created in a `Scheduler.js` file
+
+```ts
+var timerQueue: Array<Task> = [];
+```
+it is empty array first and is filled via `scheduleCallback` function.
+Scheduler doesn't use TimersQueue to get the task from it and execute when the time comes, what is done is that
+TimerQueue stores the tasks and when time comes it is moved from timersQueue in tasksQueue to execute. This implementation exist
+to preserve the order execution by priority, for example if there is a NormalPriority task in timersQueue and it is time 
+to execute, it doesn't execute right away because there might be higher priority tasks in taskQueue that needs to be executed first
+by that the order is properly reserved. Task is exactly the same object as it is for tasksQueue with one differenct there is additional
+startTime field. this startTime field is like timeout that sets the timer when to call this function. for example if 
+`scheduleCallback` is called with 2000 delay parameter it means that this function should be executed in 2000 seconds from now
+and the startTime is set properly. to repeat for clearance it is not guaranteed that the task will be executed in 
+2s, what it means that roughly in 2s it will be moved to the tasksQueue and then it is up to tasksQueue to know when to execute.
+
+Let's see how this moving from timers to tasks queue works. the function that does all the hard work is `advanceTimers`.
+advanceTimers looks like this
+```ts
+function advanceTimers(currentTime: number) {
+  // Check for tasks that are no longer delayed and add them to the queue.
+  let timer = peek(timerQueue);
+  while (timer !== null) {
+    if (timer.callback === null) {
+      // Timer was cancelled.
+      pop(timerQueue);
+    } else if (timer.startTime <= currentTime) {
+      // Timer fired. Transfer to the task queue.
+      pop(timerQueue);
+      timer.sortIndex = timer.expirationTime;
+      push(taskQueue, timer);
+    } else {
+      // Remaining timers are pending.
+      return;
+    }
+    timer = peek(timerQueue);
+  }
+}
+```
+
+on every call, it picks the first task from TimersQueue, if it is nulll then it means the queue is empty, if not it is processed with following
+if callback is null then it means the timer is cancelled and needs to be removed. task can be cancelled in two ways in general
+first remove it from the Queue second set the callback to null. when the first item needs to be canceled it is removed from the Queue, but if the task
+is in the middle or somewhere else in the Queue, removing it from the Queue and resort it wont be efficient, so the task.callback is set to null.
+which flags that when this task is peeked it should be removed, that's exactly what's happening here.
+if the callback is not null then it is checked if it is time to execute, it is checked by if startTime is less then currentTime
+think of it like setTimeout immitation, if this happens then this task sortIndex is updated to use expirationTime as it is used for
+tasksQueue, removed from timerQueue and moved to the tasksQueue. it is very simple function but crucial for Scheduler,
+this function is called in multiple places, the behavior is the same, to make it simple and short this function checks 
+if it is time to move task from timersQueue to the tasksQueue. the currentTime is the currentTime (time.now()).
+
+the task in timersQueue is via `scheduleCallback` when delay parameter is specified it is the criteria if task is moved from
+`tasksQueue` or in `timersQueue`
