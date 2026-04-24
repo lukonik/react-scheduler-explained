@@ -1,0 +1,34 @@
+---
+title: Browser Work
+---
+
+# Browser Work
+
+Scheduler has two main job, first is to order tasks sequentally by priorities, the second is to give browser chance
+to do it's work while tasks are executing so to give it a breath and not lock the screen or something. Now how would you do
+something like that in a programming language that is synchrnous and you can't run two parallel threads that will execute
+your code and browser code.
+
+:::note
+    if webworker comes into your mind, it wont work because both of the code needs access to DOM which is not available
+    in webworker.
+:::
+
+Well React team to decide the following approach: from time to time give browser to control something to execute
+and then continue the work, we will see how it is implemented exaclty in this chapter.
+
+Now there is no method like `processBrowserWork` that can be called and it will execute whatever browser needs to do
+for example render the frame. Browser work is added to the Call Stack and executed whenever app code finishes execution.
+so if your code is running, browser will wait to finish execution and then do it's job. Imagine the tasksQueue has 100 task to execute
+and it iterates over the tasksQueue to execute all of them now it will hang the browser work until everything is executed,
+which will lock the browser work and make the website laggy, to avoid that React found the smart solution that relies on 
+how Javascript engine is working, as you already know from the event loop section, there are cycles in Javascript
+so there is current execution it is filled in callstack when it becomes empty the next cycle begins when there is new function
+what you can do is to schedule the function to run in the next cycle, for example `setTimeout(callback,0)` will move callback
+to the next cycle and it wont blog other functions in the current callstack. React uses this behavior. so what it does
+is that during task work loop it has a limit how long it can run currently it is 5 milliseconds, if it is running 
+more then 5 milliseconds it breaks from the while loop and schedules the workLoop to run in the next tick. doing that 
+gives browser to execute if it had something to execute because the callstack is not filled with App code anymore. so when the next cycle begins
+the workLoop resumes and the process is started over again the tasksk are exeecuted until 5 miliseconds limits then do it again.
+You will see exactly the code how it is done and how workLoop works. but the main topic of this area is for you to understand how it works.
+ 
