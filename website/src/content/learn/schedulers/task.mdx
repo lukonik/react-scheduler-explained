@@ -3,3 +3,102 @@ title: Task
 ---
 
 # Task
+
+Task is an entity that represetns the callback function, that will be executed bt scheduler i has following properties:
+id, sortIndex,callback,priorityLevle,expirationTime,startTime
+
+we will explore each and every field that will give us clear picture how scheduler works. Let's start with most important one with callback
+
+## callback
+
+callback is a function that will be executed it is passsed to scheduler from outside of world mainly registered via `scheduleCallback` scheduler passes one boolean to the
+callback namely `didUserCallbackTimeout` This boolean tells callback that it was called overdue not in timeframe when it was okay to execute the callback React checks this 
+boolean and if it is true it knows that it has to hurry up and execute whatever it needs to do immediately. also callback can return the function if nothing is return the task is removed from the queue if
+function is returned that means that there still work needs to be done, so task callback is set to this function and kept in Queue on the next time when time comes this function si executed React uses it
+to pause heavy function and resume it later.
+
+For a quick example:
+
+[HERE_IS_QUICK_EXAMPLE]
+
+callback will appear later chapter as well, so if you don't see it how it works no worries you will get full picture for it.
+Let's discuss next field priorityLevel
+
+## PriorityLevel
+
+PriorityLevel is the one that defined when to execute the callback. Important notice that "when" doesn't mean time in future.
+Scheduler will execute the tasks as soon as it is possible the "when" means the order level so if we have Task A, Task B, Task C
+in which order they can execute. So in short priorityLevel means order. PriorityLevel has six callable priority values
+
+### NoPriority
+this is basically "null" value of priority, it is never case
+
+### ImmediatePriority
+this is the highest priority it must execute ASAP
+
+### UserBlockingPriority
+this is still high priority but it's have still small gap to execute
+
+### NormalPriority
+this is normalpriority
+
+### LowPriority
+Lowp riority
+
+### IdlePriority
+this is the priority it's okay if it never runs
+
+Priority Levelis not used explicitely to sort taskss in Queue imagine 2 tasks registered with same priorityLevel which one should execute first?
+there is need for something more precise value. The priority value is used to compute expirationTime which will be used for sorting we are going to discuss it next.
+
+## expirationTime
+expirationTime is a value that is computed by priorityLevel and time, it is almost unqiue value I say almost you'll see why and is used primarily as sorting value in TasksQueue
+expirationTime is computed by following: (current time) + (timeout by priority)
+
+this timeout based on priority are following values:
+
+* ImmediatePriroity => -1
+* UserBlockingPriority => 250
+* NormalPriority => 5 000
+* LowPriority => 10 000
+* IdlePriority => MAX_INT_VALUE ( rougly 107,374,182,3)
+
+so the formula is
+
+expirationTime = startTime + timeout
+
+for example if callback si scheduled with immediate priority it will be
+
+[EXAMPLE_CODE]
+
+or callback with userBlockingPriority it will be
+
+[EXAMPLE_CODE]
+
+now you might wonder why not use simple counter value for sorting. That will be guaranteed uniquely and sorted ascedantley.
+The answer lies in the callback passing parameter that we talked about before to remind you it is a boolean called `didUserCallbackTimeout`
+this boolean is computed comparing expirationTime with currentTime. this is indicator that callback had to execute before but overdued This is important
+for React to decide how to process code inside the callback. Think of it that React will decide to run the callback code internally immediately or maybe wait a bit 
+and do something else meanwhile. so the simple counter wont give y that flexibility but the issue is that expiration might end up duplicated so in addition to that id field 
+is used for sorting before we move on, notice that immediatePriority gap value is -1 which means that expirationTime is always pastValiue so `diduserCallbackTimeout` will be true always
+
+## Id
+
+id is the simple incremental id it is used for debuggin purpsose as well for sorting the tasks in Queue when expirationDate has same value
+
+## StartTime
+
+As we know already there are two Queues for tasks is TasksQueue and second the TimersQueue.
+TasksQueue is primary queue that is processed by scheduler. TimersQueue is a wait queue as we know already that callback is registered with priority level. In addition to that
+there is a delay parameter that can be passed. This delay parameter is used to schedule callback in future, think of it as a setTimeout scheduling. when this is specified the task is 
+to the TimersQueue when time comes it is moved to TaskskQueue and processed accordingely.
+
+The start time is computed adding delay + currentTime. This ensures that it will execute correctly whe time comes and for TimersQueue startTime is used for sorting the Queue
+The expiration date is computed with following formulat:
+expirationTime = startTime + timeout
+the currentTime is replaced with startTime the raeson behind that is that when it will be moved to taskQueue and process by scheduler it would be always overdude if it was used  currentTime
+other thant that expirationTime is exactly the same
+we will talk about the Queues in depth in later section just keep in mind the startTIme is the indicator when it will run
+
+## sortIndex
+sortIndex is the sorting field for Queue if it is Tasks Queue expirationTime is set to sortIndex if TimersQueue startTime is used
