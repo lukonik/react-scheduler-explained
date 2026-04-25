@@ -75,6 +75,10 @@ export default defineConfig({
               label: "performWorkUntilDeadline",
               slug: "learn/schedulers/performWorkUntilDeadline",
             },
+            {
+              label: "flushWork",
+              slug: "learn/schedulers/flushWork",
+            },
           ],
         },
       ],

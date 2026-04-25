@@ -1,0 +1,40 @@
+# FlushWork
+
+FlushWorks calls the workLoop internally and does some preconfigure and cleanup job, this is the source code
+
+```ts
+function flushWork(initialTime: number) {
+  // We'll need a host callback the next time work is scheduled.
+  isHostCallbackScheduled = false;
+  if (isHostTimeoutScheduled) {
+    // We scheduled a timeout but it's no longer needed. Cancel it.
+    isHostTimeoutScheduled = false;
+    cancelHostTimeout();
+  }
+
+  isPerformingWork = true;
+  const previousPriorityLevel = currentPriorityLevel;
+  try {
+    return workLoop(initialTime);
+  } finally {
+    currentTask = null;
+    currentPriorityLevel = previousPriorityLevel;
+    isPerformingWork = false;
+  }
+}
+```
+
+the isHostCallbackScheduled is reseted because workLoop has begun, also if timeout is scheduled it is cancelled as well, timeout schedule is scheduler
+that checks timerQueue it is canceled because workLoop will check timersQueue itself.
+then performingWork is set tot true
+
+the previousPriorityLevel is set to the currentLevel which is used to restore currentPriorityLevel after workLoop finishes execution
+thats because currentPriorityLevel is updated per task in workLoop and if the error happens or the workLoop is break because of browser previousPriorityLevel
+the global currentPriorityLevel will be leaked to the currentTask to avoid this it is restored whatever was before the workLoop execution.
+
+so the workLoop is executed the return value of workLoop is either there is more work to be done or not to reschedule again the workLoop
+and finally cleansup the global variable, as I said to avoid leakage same thing for currentTask.
+
+and this is how scheduler goes from adding calling requestCallback to add the task to the workLoop which executes the task.
+we are almost finished the only left are to understand the scheduling of timeout which works on timersQueue and some utlity priority level functions that are handy for react.
+let's first discuss the timeout

@@ -81,3 +81,5 @@ next global startTime is set currentTime that will be later in workLoop. and the
 mainly what's happening is that flushWork executes the workLoop and returns boolean if the boolean is true then 
 it knows that there is more work to do and the work is scheduled again, otherwise messageLoopIsReset and nothing is done again.
 hasMoreWork is to check on this work. try finally is used that if error happened to reschedule it and not to silent the loop
+
+one level close to the workLoop the next function is `flushWork`
