@@ -63,6 +63,18 @@ export default defineConfig({
               label: "workLoop",
               slug: "learn/schedulers/workLoop",
             },
+            {
+              label: "requestHostCallback",
+              slug: "learn/schedulers/requestHostCallback",
+            },
+            {
+              label: "schedulePerformWorkUntilDeadline",
+              slug: "learn/schedulers/schedulePerformWorkUntilDeadline",
+            },
+            {
+              label: "performWorkUntilDeadline",
+              slug: "learn/schedulers/performWorkUntilDeadline",
+            },
           ],
         },
       ],
