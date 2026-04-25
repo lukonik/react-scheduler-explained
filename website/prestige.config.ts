@@ -59,6 +59,10 @@ export default defineConfig({
               label: "scheduleCallback",
               slug: "learn/schedulers/scheduleCallback",
             },
+            {
+              label: "workLoop",
+              slug: "learn/schedulers/workLoop",
+            },
           ],
         },
       ],

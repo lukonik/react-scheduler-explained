@@ -13,6 +13,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as prestigeLearnIntroductionRouteImport } from './routes/(prestige)/learn.introduction'
+import { Route as prestigeLearnSchedulersWorkLoopRouteImport } from './routes/(prestige)/learn.schedulers.workLoop'
 import { Route as prestigeLearnSchedulersTaskRouteImport } from './routes/(prestige)/learn.schedulers.task'
 import { Route as prestigeLearnSchedulersSchedulerIntroRouteImport } from './routes/(prestige)/learn.schedulers.scheduler-intro'
 import { Route as prestigeLearnSchedulersSchedulerRouteImport } from './routes/(prestige)/learn.schedulers.scheduler'
@@ -46,6 +47,18 @@ const prestigeLearnIntroductionRoute = prestigeLearnIntroductionRouteImport
   .lazy(() =>
     import('./routes/(prestige)/learn.introduction.lazy').then((d) => d.Route),
   )
+const prestigeLearnSchedulersWorkLoopRoute =
+  prestigeLearnSchedulersWorkLoopRouteImport
+    .update({
+      id: '/schedulers/workLoop',
+      path: '/schedulers/workLoop',
+      getParentRoute: () => prestigeLearnLazyRoute,
+    } as any)
+    .lazy(() =>
+      import('./routes/(prestige)/learn.schedulers.workLoop.lazy').then(
+        (d) => d.Route,
+      ),
+    )
 const prestigeLearnSchedulersTaskRoute = prestigeLearnSchedulersTaskRouteImport
   .update({
     id: '/schedulers/task',
@@ -167,6 +180,7 @@ export interface FileRoutesByFullPath {
   '/learn/schedulers/scheduler': typeof prestigeLearnSchedulersSchedulerRoute
   '/learn/schedulers/scheduler-intro': typeof prestigeLearnSchedulersSchedulerIntroRoute
   '/learn/schedulers/task': typeof prestigeLearnSchedulersTaskRoute
+  '/learn/schedulers/workLoop': typeof prestigeLearnSchedulersWorkLoopRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -181,6 +195,7 @@ export interface FileRoutesByTo {
   '/learn/schedulers/scheduler': typeof prestigeLearnSchedulersSchedulerRoute
   '/learn/schedulers/scheduler-intro': typeof prestigeLearnSchedulersSchedulerIntroRoute
   '/learn/schedulers/task': typeof prestigeLearnSchedulersTaskRoute
+  '/learn/schedulers/workLoop': typeof prestigeLearnSchedulersWorkLoopRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -196,6 +211,7 @@ export interface FileRoutesById {
   '/(prestige)/learn/schedulers/scheduler': typeof prestigeLearnSchedulersSchedulerRoute
   '/(prestige)/learn/schedulers/scheduler-intro': typeof prestigeLearnSchedulersSchedulerIntroRoute
   '/(prestige)/learn/schedulers/task': typeof prestigeLearnSchedulersTaskRoute
+  '/(prestige)/learn/schedulers/workLoop': typeof prestigeLearnSchedulersWorkLoopRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -212,6 +228,7 @@ export interface FileRouteTypes {
     | '/learn/schedulers/scheduler'
     | '/learn/schedulers/scheduler-intro'
     | '/learn/schedulers/task'
+    | '/learn/schedulers/workLoop'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -226,6 +243,7 @@ export interface FileRouteTypes {
     | '/learn/schedulers/scheduler'
     | '/learn/schedulers/scheduler-intro'
     | '/learn/schedulers/task'
+    | '/learn/schedulers/workLoop'
   id:
     | '__root__'
     | '/'
@@ -240,6 +258,7 @@ export interface FileRouteTypes {
     | '/(prestige)/learn/schedulers/scheduler'
     | '/(prestige)/learn/schedulers/scheduler-intro'
     | '/(prestige)/learn/schedulers/task'
+    | '/(prestige)/learn/schedulers/workLoop'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -268,6 +287,13 @@ declare module '@tanstack/react-router' {
       path: '/introduction'
       fullPath: '/learn/introduction'
       preLoaderRoute: typeof prestigeLearnIntroductionRouteImport
+      parentRoute: typeof prestigeLearnLazyRoute
+    }
+    '/(prestige)/learn/schedulers/workLoop': {
+      id: '/(prestige)/learn/schedulers/workLoop'
+      path: '/schedulers/workLoop'
+      fullPath: '/learn/schedulers/workLoop'
+      preLoaderRoute: typeof prestigeLearnSchedulersWorkLoopRouteImport
       parentRoute: typeof prestigeLearnLazyRoute
     }
     '/(prestige)/learn/schedulers/task': {
@@ -347,6 +373,7 @@ interface prestigeLearnLazyRouteChildren {
   prestigeLearnSchedulersSchedulerRoute: typeof prestigeLearnSchedulersSchedulerRoute
   prestigeLearnSchedulersSchedulerIntroRoute: typeof prestigeLearnSchedulersSchedulerIntroRoute
   prestigeLearnSchedulersTaskRoute: typeof prestigeLearnSchedulersTaskRoute
+  prestigeLearnSchedulersWorkLoopRoute: typeof prestigeLearnSchedulersWorkLoopRoute
 }
 
 const prestigeLearnLazyRouteChildren: prestigeLearnLazyRouteChildren = {
@@ -366,6 +393,7 @@ const prestigeLearnLazyRouteChildren: prestigeLearnLazyRouteChildren = {
   prestigeLearnSchedulersSchedulerIntroRoute:
     prestigeLearnSchedulersSchedulerIntroRoute,
   prestigeLearnSchedulersTaskRoute: prestigeLearnSchedulersTaskRoute,
+  prestigeLearnSchedulersWorkLoopRoute: prestigeLearnSchedulersWorkLoopRoute,
 }
 
 const prestigeLearnLazyRouteWithChildren =

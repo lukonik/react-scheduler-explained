@@ -1,0 +1,269 @@
+---
+title: Work Loop
+---
+
+# Work Loop
+
+WorkLoop is the work horse function that does the main job although it is called from some wrapper function in the end
+the scheduler ends up calling workLoop if we understand this function then everything else is just nuts and bolts.
+this is the source code of workLoop
+
+```ts
+function workLoop(initialTime: number) {
+  let currentTime = initialTime;
+  advanceTimers(currentTime);
+  currentTask = peek(taskQueue);
+  while (currentTask !== null) {
+    if (currentTask.expirationTime > currentTime && shouldYieldToHost()) {
+      // This currentTask hasn't expired, and we've reached the deadline.
+      break;
+    }
+    // $FlowFixMe[incompatible-use] found when upgrading Flow
+    const callback = currentTask.callback;
+    if (typeof callback === "function") {
+      // $FlowFixMe[incompatible-use] found when upgrading Flow
+      currentTask.callback = null;
+      // $FlowFixMe[incompatible-use] found when upgrading Flow
+      currentPriorityLevel = currentTask.priorityLevel;
+      // $FlowFixMe[incompatible-use] found when upgrading Flow
+      const didUserCallbackTimeout = currentTask.expirationTime <= currentTime;
+      const continuationCallback = callback(didUserCallbackTimeout);
+      currentTime = getCurrentTime();
+      if (typeof continuationCallback === "function") {
+        // If a continuation is returned, immediately yield to the main thread
+        // regardless of how much time is left in the current time slice.
+        // $FlowFixMe[incompatible-use] found when upgrading Flow
+        currentTask.callback = continuationCallback;
+
+        advanceTimers(currentTime);
+        return true;
+      } else {
+        if (currentTask === peek(taskQueue)) {
+          pop(taskQueue);
+        }
+        advanceTimers(currentTime);
+      }
+    } else {
+      pop(taskQueue);
+    }
+    currentTask = peek(taskQueue);
+  }
+  // Return whether there's additional work
+  if (currentTask !== null) {
+    return true;
+  } else {
+    const firstTimer = peek(timerQueue);
+    if (firstTimer !== null) {
+      requestHostTimeout(handleTimeout, firstTimer.startTime - currentTime);
+    }
+    return false;
+  }
+}
+```
+
+the main job of workLoop is to grab the tasks from the Queue and execute them orderly, also during this process let browser to execute
+it's work if there will be any. let's move line by line to understand the process.
+
+```ts
+let currentTime = initialTime;
+```
+
+currentTime is set by initialTime which is always the currentTime already, it is passed from outside just for the performance
+not to calculate it if it is already calculated which is the case when it is called with wrapper functions.
+
+```ts
+advanceTimers(currentTime);
+```
+
+advanceTimers as we discussed already checks the timersQueue if there is any task that is time to execute from timersQueue and needs to be moved
+in tasksQueue, this function is called in multiple places as well, and it does same thing all the time to move tasks from timerQueue to tasksQueue.
+
+```ts
+currentTask = peek(taskQueue);
+while (currentTask !== null) {
+  //...
+}
+```
+
+this is where loop begans, the task is picked from the queue if there is no task then nothing happens otherwise loop begins.
+
+```ts
+if (currentTask.expirationTime > currentTime && shouldYieldToHost()) {
+  // This currentTask hasn't expired, and we've reached the deadline.
+  break;
+}
+```
+
+now this is where the browser handle happens. so there is two conditions. the first one is
+
+```ts
+currentTask.expirationTime > currentTime;
+```
+
+this check is that expirationTime is more then currentTime then it is okay to break the while loop and give handle to browser
+because if expirationTime is less then currentTime then it means that this task is overdue and it has to be executed as soon as possible
+so it is not possible to give browser handle, now if it is true then there is next check
+
+```ts
+shouldYieldToHost;
+```
+
+this function checks that if it is already time to give browser handle, it is a fixed timer that on every X secons it gives browser
+
+handle to execute, we will not discuss it here not to add complexity we will do it later, but just to give you the small code
+to give what is does it this
+
+```ts
+let frameInterval: number = 5;
+/...
+const timeElapsed = getCurrentTime() - startTime;
+if (timeElapsed < frameInterval) {
+  return false;
+}
+// Yield now.
+return true;
+```
+
+so it checks if 5 milliseconds has passed from starting the execution it is time to stop and give browser handle,
+startTime is not task startTime field it is global variable that is set before the startTime I won't go deep for that for now
+just to make it short if 5milliseconds has passed it is time to give handle to browser
+
+so if both of this condition is true the while loop stops if not the logic is continued. now let's move a long
+
+```ts
+const callback = currentTask.callback;
+if (typeof callback === "function") {
+  // $FlowFixMe[incompatible-use] found when upgrading Flow
+  currentTask.callback = null;
+  // $FlowFixMe[incompatible-use] found when upgrading Flow
+  currentPriorityLevel = currentTask.priorityLevel;
+  // $FlowFixMe[incompatible-use] found when upgrading Flow
+  const didUserCallbackTimeout = currentTask.expirationTime <= currentTime;
+  const continuationCallback = callback(didUserCallbackTimeout);
+  currentTime = getCurrentTime();
+  if (typeof continuationCallback === "function") {
+    // If a continuation is returned, immediately yield to the main thread
+    // regardless of how much time is left in the current time slice.
+    // $FlowFixMe[incompatible-use] found when upgrading Flow
+    currentTask.callback = continuationCallback;
+
+    advanceTimers(currentTime);
+    return true;
+  } else {
+    if (currentTask === peek(taskQueue)) {
+      pop(taskQueue);
+    }
+    advanceTimers(currentTime);
+  }
+}
+```
+
+now this is quite a long if branch so we go line by line, the first one is the callback check
+
+```ts
+if (typeof callback === "function")
+```
+
+this check ensures that callback is still executable, because it might be null instead of function, null value of callback is when
+this task is cancelled and needs to be removed from the queue. removing the task from queue doesn't happen explicitely because,
+the task might be not in the first place and removing it from somewhere else in the queue array would be inneficient, so callback
+is set to null which hints the scheduler this task needs to be removed, this check is exactly for that,
+entering in the branch sets the callback to null
+
+```ts
+currentTask.callback = null;
+```
+
+this ensures that this task will be excuted only once and no more, and it will be removed later in while loop.
+
+```ts
+currentPriorityLevel = currentTask.priorityLevel;
+```
+
+this priority is set that will be available with `getCurrentPriorityLevel` and can be used later in the callback, but it doesn't effect the workLoop f unctionality
+
+let's go with the next line
+
+```ts
+const didUserCallbackTimeout = currentTask.expirationTime <= currentTime;
+const continuationCallback = callback(didUserCallbackTimeout);
+```
+
+this is the heart of the whole scheduler where after so many lines and so many my talks we arritve at the destination this is where
+the callback function is called. the didUserCallbackTimeout is the boolean which checks if the task is overdued or not and it is passed
+to the callback.
+the callback is executed and the return value is set to continuationCallback. the continuationCallback can be either null or a function
+if it is null it means that callback completed the execution, but if function returned the function is returned that will be used
+to resume the work on the next tick. this might be the case when callback is a heavy computation function and it might decide to
+return the function to allow other things to process. so if function is returned it means that it needs to execute this is the code that schedules it
+
+```ts
+if (typeof continuationCallback === "function") {
+  // If a continuation is returned, immediately yield to the main thread
+  // regardless of how much time is left in the current time slice.
+  // $FlowFixMe[incompatible-use] found when upgrading Flow
+  currentTask.callback = continuationCallback;
+
+  advanceTimers(currentTime);
+  return true;
+}
+```
+
+so there currentTask.callback is reasigned to the continuationCallback, this guarantees that the task stays with the same priority and order,
+and then advanceTimer is called to recheck the timersQueue the return true means for outside function that there is still work needs to be done
+so the outer function will schedule workLoop again
+
+so if continuationCallback is not returned, the task is rmeoved from tasksQueue
+
+```ts
+else {
+        if (currentTask === peek(taskQueue)) {
+          pop(taskQueue);
+        }
+        advanceTimers(currentTime);
+      }
+```
+
+you might wonder why this `if (currentTask === peek(taskQueue))` check is needed how currentTask be something else then, it was picked before.
+I also wonder that at first but then I found out that the callback function can schedule a new task during execution, so it might end up
+as the first item in Queue and without this check the wrong task would be removed.
+and adnvaceTimer is called as well and we are done with the branch when the callback function is defined
+if not the task is simply removed from tasksQueue.
+
+```ts
+else {
+      pop(taskQueue);
+    }
+```
+
+and finally it is time to move to the next task and loop starts again
+
+```ts
+currentTask = peek(taskQueue);
+```
+
+after loop breaks it is decided to return it is more work to do or not
+
+```ts
+if (currentTask !== null) {
+  return true;
+} else {
+  const firstTimer = peek(timerQueue);
+  if (firstTimer !== null) {
+    requestHostTimeout(handleTimeout, firstTimer.startTime - currentTime);
+  }
+  return false;
+}
+```
+
+first line is that if currentTask still exists and not set to null, it still processed so true is returned
+otherwise the timerQueue is checked and if there is a timer task, the workLoop is scheduled in the delay time.
+
+when I mention to schedule workLoop if you check the code there is other methods that is scheduled but the final function is
+workLoop the most important, the other ones we will discuss it later.
+
+and we are done the main function is explored. I sugges you look the whole function again just go line by line if you understand
+how it works and if not reread the section again.
+
+Next functions that we are going to dicsuss are still important but not the major ones they are either wrappers to the workLoop functions
+or utility functions, but still important 
