@@ -281,3 +281,5 @@ else {
 sortIndex is set to expirationTime and the task is added to the tasksQueue. the last code is similar to timers queue
 it checks wheter the callback is not scheduled and there is no performing work which means that the workLoop will not executed and it is not scheduled to execute
 the work is scheduled
+
+Now we know how tasks are added let's see how they are processed, the main function that does this is `workLoop` that we will discuss next.
