@@ -1,4 +1,4 @@
-import type {PriorityLevel} from './priorities.ts';
+import type { PriorityLevel } from "./priorities.ts";
 
 import {
   frameYieldMs,
@@ -6,12 +6,11 @@ import {
   lowPriorityTimeout,
   normalPriorityTimeout,
   enableRequestPaint,
-  enableAlwaysYieldScheduler,
-} from './flags.ts';
+} from "./flags.ts";
 
-import {push, pop, peek} from './mini-heap.ts';
+import { push, pop, peek } from "./mini-heap.ts";
 
-declare var setImmediate:any;
+declare var setImmediate: any;
 
 // TODO: Use symbols?
 import {
@@ -20,23 +19,23 @@ import {
   NormalPriority,
   LowPriority,
   IdlePriority,
-} from './priorities.ts';
+} from "./priorities.ts";
 
 type Callback = (arg: boolean) => Callback | null | undefined;
 
 export type Task = {
-  id: number,
-  callback: Callback | null,
-  priorityLevel: PriorityLevel,
-  startTime: number,
-  expirationTime: number,
-  sortIndex: number,
+  id: number;
+  callback: Callback | null;
+  priorityLevel: PriorityLevel;
+  startTime: number;
+  expirationTime: number;
+  sortIndex: number;
 };
 
 let getCurrentTime: () => number | DOMHighResTimeStamp;
 const hasPerformanceNow =
   // $FlowFixMe[method-unbinding]
-  typeof performance === 'object' && typeof performance.now === 'function';
+  typeof performance === "object" && typeof performance.now === "function";
 
 if (hasPerformanceNow) {
   const localPerformance = performance;
@@ -59,7 +58,7 @@ var timerQueue: Array<Task> = [];
 // Incrementing id counter. Used to maintain insertion order.
 var taskIdCounter = 1;
 
-var currentTask:Task | null = null;
+var currentTask: Task | null = null;
 var currentPriorityLevel: PriorityLevel = NormalPriority;
 
 // This is set while performing work, to prevent re-entrance.
@@ -71,10 +70,10 @@ var isHostTimeoutScheduled = false;
 var needsPaint = false;
 
 // Capture local references to native APIs, in case a polyfill overrides them.
-const localSetTimeout =setTimeout;
-const localClearTimeout = clearTimeout
+const localSetTimeout = setTimeout;
+const localClearTimeout = clearTimeout;
 const localSetImmediate =
-  typeof setImmediate !== 'undefined' ? setImmediate : null; // IE and Node.js + jsdom
+  typeof setImmediate !== "undefined" ? setImmediate : null; // IE and Node.js + jsdom
 
 function advanceTimers(currentTime: number) {
   // Check for tasks that are no longer delayed and add them to the queue.
@@ -138,15 +137,13 @@ function workLoop(initialTime: number) {
   advanceTimers(currentTime);
   currentTask = peek(taskQueue);
   while (currentTask !== null) {
-    if (!enableAlwaysYieldScheduler) {
-      if (currentTask.expirationTime > currentTime && shouldYieldToHost()) {
-        // This currentTask hasn't expired, and we've reached the deadline.
-        break;
-      }
+    if (currentTask.expirationTime > currentTime && shouldYieldToHost()) {
+      // This currentTask hasn't expired, and we've reached the deadline.
+      break;
     }
     // $FlowFixMe[incompatible-use] found when upgrading Flow
     const callback = currentTask.callback;
-    if (typeof callback === 'function') {
+    if (typeof callback === "function") {
       // $FlowFixMe[incompatible-use] found when upgrading Flow
       currentTask.callback = null;
       // $FlowFixMe[incompatible-use] found when upgrading Flow
@@ -155,7 +152,7 @@ function workLoop(initialTime: number) {
       const didUserCallbackTimeout = currentTask.expirationTime <= currentTime;
       const continuationCallback = callback(didUserCallbackTimeout);
       currentTime = getCurrentTime();
-      if (typeof continuationCallback === 'function') {
+      if (typeof continuationCallback === "function") {
         // If a continuation is returned, immediately yield to the main thread
         // regardless of how much time is left in the current time slice.
         // $FlowFixMe[incompatible-use] found when upgrading Flow
@@ -173,12 +170,6 @@ function workLoop(initialTime: number) {
       pop(taskQueue);
     }
     currentTask = peek(taskQueue);
-    if (enableAlwaysYieldScheduler) {
-      if (currentTask === null || currentTask.expirationTime > currentTime) {
-        // This currentTask hasn't expired we yield to the browser task.
-        break;
-      }
-    }
   }
   // Return whether there's additional work
   if (currentTask !== null) {
@@ -262,14 +253,14 @@ function wrapCallback<T extends (...args: any[]) => any>(callback: T): T {
 function scheduleCallback(
   priorityLevel: PriorityLevel,
   callback: Callback,
-  options?: {delay: number},
+  options?: { delay: number },
 ): Task {
   var currentTime = getCurrentTime();
 
   var startTime;
-  if (typeof options === 'object' && options !== null) {
+  if (typeof options === "object" && options !== null) {
     var delay = options.delay;
-    if (typeof delay === 'number' && delay > 0) {
+    if (typeof delay === "number" && delay > 0) {
       startTime = currentTime + delay;
     } else {
       startTime = currentTime;
@@ -367,7 +358,7 @@ let frameInterval: number = frameYieldMs;
 let startTime = -1;
 
 function shouldYieldToHost(): boolean {
-  if (!enableAlwaysYieldScheduler && enableRequestPaint && needsPaint) {
+  if (!enableRequestPaint && needsPaint) {
     // Yield now.
     return true;
   }
@@ -390,9 +381,9 @@ function requestPaint() {
 function forceFrameRate(fps: number) {
   if (fps < 0 || fps > 125) {
     // Using console['error'] to evade Babel and ESLint
-    console['error'](
-      'forceFrameRate takes a positive int between 0 and 125, ' +
-        'forcing frame rates higher than 125 fps is not supported',
+    console["error"](
+      "forceFrameRate takes a positive int between 0 and 125, " +
+        "forcing frame rates higher than 125 fps is not supported",
     );
     return;
   }
@@ -436,7 +427,7 @@ const performWorkUntilDeadline = () => {
 };
 
 let schedulePerformWorkUntilDeadline;
-if (typeof localSetImmediate === 'function') {
+if (typeof localSetImmediate === "function") {
   // Node.js and old IE.
   // There's a few reasons for why we prefer setImmediate.
   //
@@ -451,7 +442,7 @@ if (typeof localSetImmediate === 'function') {
   schedulePerformWorkUntilDeadline = () => {
     localSetImmediate(performWorkUntilDeadline);
   };
-} else if (typeof MessageChannel !== 'undefined') {
+} else if (typeof MessageChannel !== "undefined") {
   // DOM and Worker environments.
   // We prefer MessageChannel because of the 4ms setTimeout clamping.
   const channel = new MessageChannel();
@@ -487,7 +478,7 @@ function requestHostTimeout(
 
 function cancelHostTimeout() {
   localClearTimeout(taskTimeoutID);
-  taskTimeoutID = -1
+  taskTimeoutID = -1;
 }
 
 export {

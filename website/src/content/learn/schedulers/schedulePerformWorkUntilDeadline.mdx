@@ -1,0 +1,54 @@
+# SchedulePerformWorkUntilDeadline
+
+so how this workLoop is scheduled it is done with `schedulePerformWorkUntilDeadline` function. Now scheduling happens, on the next event cycle,
+scheduler tries to register it as a first callback in the next event cycle. depending on platform and availabe methods the best
+scheduling mechanism is chosed, let's see the code
+
+```ts
+let schedulePerformWorkUntilDeadline;
+if (typeof localSetImmediate === "function") {
+  // Node.js and old IE.
+  // There's a few reasons for why we prefer setImmediate.
+  //
+  // Unlike MessageChannel, it doesn't prevent a Node.js process from exiting.
+  // (Even though this is a DOM fork of the Scheduler, you could get here
+  // with a mix of Node.js 15+, which has a MessageChannel, and jsdom.)
+  // https://github.com/facebook/react/issues/20756
+  //
+  // But also, it runs earlier which is the semantic we want.
+  // If other browsers ever implement it, it's better to use it.
+  // Although both of these would be inferior to native scheduling.
+  schedulePerformWorkUntilDeadline = () => {
+    localSetImmediate(performWorkUntilDeadline);
+  };
+} else if (typeof MessageChannel !== "undefined") {
+  // DOM and Worker environments.
+  // We prefer MessageChannel because of the 4ms setTimeout clamping.
+  const channel = new MessageChannel();
+  const port = channel.port2;
+  channel.port1.onmessage = performWorkUntilDeadline;
+  schedulePerformWorkUntilDeadline = () => {
+    port.postMessage(null);
+  };
+} else {
+  // We should only fallback here in non-browser environments.
+  schedulePerformWorkUntilDeadline = () => {
+    // $FlowFixMe[not-a-function] nullable value
+    localSetTimeout(performWorkUntilDeadline, 0);
+  };
+}
+```
+
+now as you see first is the setImmediate function that what is doing is the on the next event cycle this function will be the first in the stack.
+it is only available on NodeJS and IE explorer so if not then MessageChannel is used MessageChannel postMessage will execute onMessage on next event cycle
+so it is used as alternative and finaly if nothing is supported then setTimeout is used, which is available everywhere.
+you might wonder what is this localSetImmediate and localSetTimeout they are declared in the top and set to setTimeout and setImmediate or default to polyfill if those doesn't exist.
+in our source code this checks are removed because setTImeout is available from the ICE age of browsers, the declaration is in scheduler top part
+```ts
+// Capture local references to native APIs, in case a polyfill overrides them.
+const localSetTimeout = setTimeout;
+const localClearTimeout = clearTimeout;
+```
+
+so to sum up calling `schedulePerformWorkUntilDeadline` will schedule the workLoop on the next event cycle. let's explore next function
+that is executed in `schedulePerformWorkUntilDeadline` called `performWorkUntilDeadline`

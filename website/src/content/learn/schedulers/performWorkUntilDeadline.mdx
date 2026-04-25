@@ -1,0 +1,85 @@
+# PerformWorkUntilDeadline
+
+we are very close to the `workLoop` the performWorkUntilDeadline looks following
+
+```ts
+const performWorkUntilDeadline = () => {
+  if (enableRequestPaint) {
+    needsPaint = false;
+  }
+  if (isMessageLoopRunning) {
+    const currentTime = getCurrentTime();
+    // Keep track of the start time so we can measure how long the main thread
+    // has been blocked.
+    startTime = currentTime;
+
+    // If a scheduler task throws, exit the current browser task so the
+    // error can be observed.
+    //
+    // Intentionally not using a try-catch, since that makes some debugging
+    // techniques harder. Instead, if `flushWork` errors, then `hasMoreWork` will
+    // remain true, and we'll continue the work loop.
+    let hasMoreWork = true;
+    try {
+      hasMoreWork = flushWork(currentTime);
+    } finally {
+      if (hasMoreWork) {
+        // If there's more work, schedule the next message event at the end
+        // of the preceding one.
+        schedulePerformWorkUntilDeadline();
+      } else {
+        isMessageLoopRunning = false;
+      }
+    }
+  }
+};
+```
+
+the first expression resets the `needsPaint` variable which we will dicsuss later, but in short needsPaint variable
+says the workLoop to stop the loop because there is browser processes need to happen
+
+```ts
+if (enableRequestPaint) {
+  needsPaint = false;
+}
+```
+
+next we will analyze as a whole
+
+```ts
+if (isMessageLoopRunning) {
+  const currentTime = getCurrentTime();
+  // Keep track of the start time so we can measure how long the main thread
+  // has been blocked.
+  startTime = currentTime;
+
+  // If a scheduler task throws, exit the current browser task so the
+  // error can be observed.
+  //
+  // Intentionally not using a try-catch, since that makes some debugging
+  // techniques harder. Instead, if `flushWork` errors, then `hasMoreWork` will
+  // remain true, and we'll continue the work loop.
+  let hasMoreWork = true;
+  try {
+    hasMoreWork = flushWork(currentTime);
+  } finally {
+    if (hasMoreWork) {
+      // If there's more work, schedule the next message event at the end
+      // of the preceding one.
+      schedulePerformWorkUntilDeadline();
+    } else {
+      isMessageLoopRunning = false;
+    }
+  }
+}
+```
+
+first check is if `isMessageLoopRunning` is running it doesn't do anything because work is already doing 
+
+next global startTime is set currentTime that will be later in workLoop. and then it is the core logic part
+
+mainly what's happening is that flushWork executes the workLoop and returns boolean if the boolean is true then 
+it knows that there is more work to do and the work is scheduled again, otherwise messageLoopIsReset and nothing is done again.
+hasMoreWork is to check on this work. try finally is used that if error happened to reschedule it and not to silent the loop
+
+one level close to the workLoop the next function is `flushWork`

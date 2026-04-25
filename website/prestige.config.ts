@@ -47,6 +47,38 @@ export default defineConfig({
               label: "Task",
               slug: "learn/schedulers/task",
             },
+            {
+              label: "Browser Work",
+              slug: "learn/schedulers/browser-work",
+            },
+            {
+              label: "Scheduler Intro",
+              slug: "learn/schedulers/scheduler-intro",
+            },
+            {
+              label: "scheduleCallback",
+              slug: "learn/schedulers/scheduleCallback",
+            },
+            {
+              label: "workLoop",
+              slug: "learn/schedulers/workLoop",
+            },
+            {
+              label: "requestHostCallback",
+              slug: "learn/schedulers/requestHostCallback",
+            },
+            {
+              label: "schedulePerformWorkUntilDeadline",
+              slug: "learn/schedulers/schedulePerformWorkUntilDeadline",
+            },
+            {
+              label: "performWorkUntilDeadline",
+              slug: "learn/schedulers/performWorkUntilDeadline",
+            },
+            {
+              label: "flushWork",
+              slug: "learn/schedulers/flushWork",
+            },
           ],
         },
       ],

@@ -1,0 +1,24 @@
+---
+title: RequestHostCallback
+---
+
+# RequestHostCallback
+
+as we said scheduler doesn't do anything unless explicitely said to do so. one of the functions that does this is `requestHostCallback`
+requestHostCallback schedules workLoop to run
+
+this is the implementation of it
+
+```ts
+function requestHostCallback() {
+  if (!isMessageLoopRunning) {
+    isMessageLoopRunning = true;
+    schedulePerformWorkUntilDeadline();
+  }
+}
+```
+
+it's pretty easy to understand so whats happening is that it is checked if it workLoop is already scheduled so not to overschedule it
+if it is not workLoop is scheduled.
+
+let's go along to continue with `schedulePerformWorkUntilDeadline`
