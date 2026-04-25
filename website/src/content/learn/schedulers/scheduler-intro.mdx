@@ -1,0 +1,26 @@
+---
+title: Scheduler Intro
+---
+
+# Scheduler Intro
+
+We finally arrive at the critical functionality, congratulations. we have all the neccessary knowledge to explore
+how exactly scheduler works. to remind us the crucial points these are:
+
+- Task is a function with priority that will be executed orderly without sacrificing browsers work
+- There are two Priority Queues that these tasks are stored
+  ** TasksQueue main queue for registering tasks that needs to be executed as soon as resource is available
+  ** TimersQueue that stores tasks that will be executed later in future, specified by delayed option
+- Scheduler uses event loop callstack functionality to give capability to the browser to execute its work in current even cycle
+
+We will now divide and conquer methods and logic for scheduler and then unite everything up to understand what's happening and how.
+
+Whenever Scheduler Queues (TasksQueue and TimersQueue) are empty there is no code executed in scheduler, there is no while loop
+that checks all the time if there is any task in a queue to execute,
+it is shut off, as soon as task is registered the process starts. The main entry point for scheduler is the function
+
+`scheduleCallback` this function is used to register the task, as soon as this task is registered the process begins.
+Let's see the source code of the `scheduleCallback`
+
+let's find out how `scheduleCallback` works
+

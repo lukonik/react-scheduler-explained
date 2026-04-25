@@ -47,9 +47,17 @@ export default defineConfig({
               label: "Task",
               slug: "learn/schedulers/task",
             },
-             {
+            {
               label: "Browser Work",
               slug: "learn/schedulers/browser-work",
+            },
+            {
+              label: "Scheduler Intro",
+              slug: "learn/schedulers/scheduler-intro",
+            },
+            {
+              label: "scheduleCallback",
+              slug: "learn/schedulers/scheduleCallback",
             },
           ],
         },
