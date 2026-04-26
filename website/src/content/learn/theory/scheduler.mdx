@@ -3,3 +3,45 @@ title: Scheduler
 ---
 
 # Scheduler
+
+Scheduler is the smart task manager. This is where all the pieces connect together. Scheduler itself is contained in a `Scheduler.js` file
+it is not a class but rather functions and global variables that cowork together. there are exported functions that give React capability
+to register tasks in the proper Queue and internal functions that are workhorse for the scheduler management system. In this chapter
+we will discuss how all those nuts and bolts are connected together, and we will have brief overview over the main functions to understand how they work.
+This won't give you step by step explanation of line of codes, but will give you understanding how it works. after this chapter
+you can check each and every chapter of per functions that will give you detail explanation of line by line how it works. Let's get started.
+
+everything starts with queues declaration, There are two Queues: tasksQueue and timersQueue.
+
+```ts
+var taskQueue: Array<Task> = [];
+var timerQueue: Array<Task> = [];
+```
+
+tasksQueue is the main queue that is used to add tasks that needs to be called whenever it is possible. and timersQueue where
+the delayed tasks are added that will be executed at some point in future.
+
+Now to process the tasks scheduler has a work loop that literally iterates of tasks from the tasksQueue in while loop and executed
+them orderly and sequentally. this work loop happens in `workLoop` function. from now one when I mention `workLoop` I mean the process that processes tasks from taskQueue.
+
+this workLoop is not running constantly meaning that the while loop doesn't run always to check if it has any tasksToProcess. it is turned off
+by default and it needs to be called manually. calling it happens via scheduling it, and not just calling it explicitely. I will explain shortly why,
+but let's see how scheduling works. whenever workLoop scheduling happens it is scheduled on the next event cycle, using one of the available methods, for simplicitely
+it is done via setTimeou(schedule,0). so whenever there is to process the workLoop it is scheduled and run in the next event cycle, to
+not to overschedule it the scheduling happens from `requestHostCallback` function, it looks like this
+
+```ts
+function requestHostCallback() {
+  if (!isMessageLoopRunning) {
+    isMessageLoopRunning = true;
+    schedulePerformWorkUntilDeadline();
+  }
+}
+```
+`isMessageLoopRunning` is a global variable that prevents to schedule it again if it is scheduled to run `schedulePerformWorkUntilDeadline`
+does the scheduling itself meaning calling the workLoop function in next event cycle using available methods like `setTimeout`.
+
+the scheduling happens whenever the task is registered to the queue. then it is logical to schedule a workLoop for processing. Now you might guess already
+why workLoop is not called explicitely but scheduled, that because if it was not scheduled and run right away, after adding task it would be processed right away
+and would loose whole point of the task processing in the first place, imagine adding task to queue queue has 1 item processed then it has 0 item, and so one.
+so instead of it it is done in the next event cycle, so any number of tasks can be added without processing it right away.
