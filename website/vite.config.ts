@@ -8,6 +8,12 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import tailwindcss from "@tailwindcss/vite";
 import viteReact from "@vitejs/plugin-react";
 const config = defineConfig({
+  optimizeDeps: {
+    include: [
+      "use-sync-external-store/shim",
+      "use-sync-external-store/shim/with-selector",
+    ],
+  },
   plugins: [
     prestige(),
     devtools(),
