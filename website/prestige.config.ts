@@ -33,24 +33,29 @@ export default defineConfig({
           ],
         },
         {
-          label: "Scheduler",
+          label: "Theory",
           items: [
             {
-              label: "Scheduler",
-              slug: "learn/schedulers/scheduler",
-            },
-            {
               label: "Queues",
-              slug: "learn/schedulers/queues",
+              slug: "learn/theory/queues",
             },
             {
               label: "Task",
-              slug: "learn/schedulers/task",
+              slug: "learn/theory/task",
             },
             {
               label: "Browser Work",
-              slug: "learn/schedulers/browser-work",
+              slug: "learn/theory/browser-work",
             },
+            {
+              label: "Scheduler",
+              slug: "learn/theory/scheduler",
+            },
+          ],
+        },
+        {
+          label: "Scheduler",
+          items: [
             {
               label: "Scheduler Intro",
               slug: "learn/schedulers/scheduler-intro",
