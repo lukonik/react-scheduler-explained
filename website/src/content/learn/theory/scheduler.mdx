@@ -59,6 +59,283 @@ function scheduleCallback(
 ```
 
 `priorityLevel` is as name suggests priority that, will be priorityLevel for task that will be used to sort it's place in task,
-the callback is the function to execute itself, and delay is the option that will 
+the callback is the function to execute itself, and delay is the option that will
 decide to put the task in tasksQueue or in timersQueue. So either tasks goes to the tasksQueue or in the timersQueue. Let's start with main
 tasksQueue.
+
+if delay is not defined then task goes to tasksQueue. the task object is created from the passed parameters that looks like this:
+
+```ts
+var newTask: Task = {
+  id: taskIdCounter++,
+  callback,
+  priorityLevel,
+  startTime,
+  expirationTime,
+  sortIndex: -1,
+};
+```
+
+`sortIndex` is the sorting criteria in the queue. for now it is null (-1) it will be updated later, when it is decided to move the tasks to the tasksQueue, that's because two different fields are used
+per Queue. for tasksQueue it is expirationTime and for timersQueue is startTime. Now Let's focus on expirationTime to understand what this value represents.
+
+```ts
+var timeout;
+switch (priorityLevel) {
+  case ImmediatePriority:
+    // Times out immediately
+    timeout = -1;
+    break;
+  case UserBlockingPriority:
+    // Eventually times out
+    timeout = userBlockingPriorityTimeout;
+    break;
+  case IdlePriority:
+    // Never times out
+    timeout = maxSigned31BitInt;
+    break;
+  case LowPriority:
+    // Eventually times out
+    timeout = lowPriorityTimeout;
+    break;
+  case NormalPriority:
+  default:
+    // Eventually times out
+    timeout = normalPriorityTimeout;
+    break;
+}
+
+var expirationTime = startTime + timeout;
+```
+
+as you see expirationTime is calculated by `startTime + timeout`. startTime is the currentTime when delay is null, so whatever the current PC time is that is the currentTime tick.
+now what about timeout. timeout is calculated based on PriorityLevel. every priorityLevel has it's timeout gap as we might say. so for example immediatePriority doesn't have any timeout gap the value is -1, which means
+that this task execution time is expired and it has to be executed as soon as possible. UserBlockingPriority has timeout has 250ms (userBlockingPriorityTimeout is a constant value with it). that means that
+when task is registered it is okay not to execute it from registering till 250ms has passed. when this value has passed that means that this task is expired and it is overdue. every callback expects optional
+boolean parameter called `didUserCallbackTimeout` and it's calculated by
+
+```ts
+const didUserCallbackTimeout = currentTask.expirationTime <= currentTime;
+```
+
+which means that time expirationTime has passed so this task is overdue, this boolean is passed to every callback `callback(didUserCallbackTimeout);`
+React uses this flag to know that this callback can't be paused or partially executed it must execute right away whatever it has to execute.
+
+So to put picture clear, Queue tasks could be ordered via simple counter integer where smaller values means the highgest priority, but then the information about the expirationTime would be lost meaning, how long the task can be wait to be okay.
+so that's why the expirationTime is used. it is still ordered ascendentaly and information is kept. Now in theory the expirationTime might be duplicated so to tasks have same value if they are scheduled exactly same time. to avoid task Collision
+the `id` field is used to addiitonaly sort it which is guaranteed to be uniquely sorted. so if expirationTime is equals then id field is used, the compare function is defined in mini-heap
+
+```ts
+function compare(a: Node, b: Node) {
+  // Compare sort index first. If there's a tie, fall back to comparing the task id.
+  const diff = a.sortIndex - b.sortIndex;
+  return diff !== 0 ? diff : a.id - b.id;
+}
+```
+
+I want to emphasize that expirationTime doesn't say that the task will run in 250ms or in 1s it is not setTimeout value, the task will be executed as soon as it can be executed, expirationTime is a callback description to specify if the
+execution was delayed(overdued) or not.
+
+so after figureing out all the details task is added to the tasksQueue
+
+```ts
+push(timerQueue, newTask);
+```
+
+Now when task is added as we know already, it won't be processed unless `workLoop` is called. and as we know `workLoop` is not called explicitely rather scheduled with `requestHostCallback` function. and that's what exactly the last lines
+of the logic do it schedules the workLoop to be executed in the next event cylcle
+
+```ts
+push(taskQueue, newTask);
+// Schedule a host callback, if needed. If we're already performing work,
+// wait until the next time we yield.
+if (!isHostCallbackScheduled && !isPerformingWork) {
+  isHostCallbackScheduled = true;
+  requestHostCallback();
+}
+```
+
+`isHostCallbackScheduled` is a global variable to avoid rescheduling the callback, and `isPerformingWork` is a boolean to check whether `workLoop` is already running.
+
+Now let's see how adding task to timersQueue works. Whenever delay is speciffied is `scheduleCallback` it means that task needs to be executed in future some time think of it as scheduling a function via `setTimeout` although Scheduler doesn't use
+`setTimeout` to schedule every single task, it uses different approach we see it right now. the scheduler computes when to run task with current time and delay and set it to the startTime field
+
+```ts
+startTime = currentTime + delay;
+```
+
+so if delay is 2s startTime will tell scheduler to run this function in 2s from now. the expirationTime is calculated the same way as for regular non delayed task, with this formula
+
+```ts
+var expirationTime = startTime + timeout;
+```
+
+now for the regular task startTime was the currentTime in this case it would be currentTime+delay. That is important because without that every single task that was in timersQueue previously would be overdued, because
+the expirationTime would be expired already for a future (unless timeout is so big that will be greater then delay, but still it is not stable). also without that expirationTime might end up in higher priority then other regular tasks in tasksQueue.
+so by that the order is preserved.
+
+Every other field is exactly the same as for regular task and then it is added to the timersQueue
+
+```ts
+push(timerQueue, newTask);
+```
+
+Now what happens when task is added in timersQueue. Scheduler doesn't schedule the workLoop, because what's the point the new added task shouldn't be executed right away, so what it does it schedules a setTimeout which will
+run exactly the same time as the delayed will specified. Because by that it will be certain that the task from timersQueue is time to execute this is the code for that
+
+```ts
+if (isHostTimeoutScheduled) {
+  // Cancel an existing timeout.
+  cancelHostTimeout();
+} else {
+  isHostTimeoutScheduled = true;
+}
+// Schedule a timeout.
+requestHostTimeout(handleTimeout, startTime - currentTime);
+```
+
+so if delay was specified 2s the `setTimeout` will exeute in 2s. the `requestHostTimeout` does that, now the upper logic is just for check not to reschedule the timeout two times when one is enough already.
+okay so `requestHostTimeout` is a `setTimeout` wrapper and looks like this
+
+```ts
+function requestHostTimeout(
+  callback: (currentTime: number) => void,
+  ms: number,
+) {
+  // $FlowFixMe[not-a-function] nullable value
+  taskTimeoutID = localSetTimeout(() => {
+    callback(getCurrentTime());
+  }, ms);
+}
+```
+
+it passes the currentTime to the callback function the important function for us is the `handleTimeout`. So how are the tasks from the timersQueue processed and executed?. Scheduler doesn't process the tasks from timersQueue similar way
+as it does for tasksQueue. but what it does it iterates over timersQueue and checks wheter it is time to execute the task, when it is time, it moves the task from timersQueue into the tasksQueue. and when `workLoop` runs the task is executed properly.
+By that tasks order is preserved perfectly, without the task priority collision, so when the task is added from TimersQueue to tasksQueue the expirationTime is already predefined, and the tasksQueue correctly stores it in the tasksQueue.
+Now that means that even though the task should run in 2s when it is registered via `scheduleCallback` with delay parameter, it is not guaranteed that it will run in 2s, probably it will run in 2s plus minus some time gap,
+but the order will be guaranteed. and that's the whole process so when task is added in timersQueue and it is time it is moved to the tasksQueu. Now let's see how `handleTimeout` looks like
+
+```ts
+function handleTimeout(currentTime: number) {
+  isHostTimeoutScheduled = false;
+  advanceTimers(currentTime);
+
+  if (!isHostCallbackScheduled) {
+    if (peek(taskQueue) !== null) {
+      isHostCallbackScheduled = true;
+      requestHostCallback();
+    } else {
+      const firstTimer = peek(timerQueue);
+      if (firstTimer !== null) {
+        requestHostTimeout(handleTimeout, firstTimer.startTime - currentTime);
+      }
+    }
+  }
+}
+```
+
+To not overcomplicate things the main parts here are the `advanceTimers` function that runs over timersQueue to move the tasks from it to the tasksQueue when it is time to do. and after that the `requestHostCallback` is scheduled to run workLoop
+to process the tasks.
+
+Okay now we should have understanding that, no matter if task is registered in tasksQueue right away or timersQueue they both end up in tasksQueue one way or another. So let's see how the tasks are processed. The main function that does heavy lifting
+is called `workLoop` although scheduler doesn't calls it epxlicitely but some wrapper functions this is where the main logic happens so we will discuss this function.
+What workLoop does is the following it iterates over the tasksQueue with while loop and executes them sequantally. Every time the task is executed and it is time for the next task to execute. It is checked if specific time frame has already passed,
+and if it is then workLoop knows that it has to give control to the browser so browser can execute if anything it has to execute, and workLoop reschedules itself for the next event cycle. Now the task execution is pretty straitforward
+it calls the callback function and passes `didUserCallbackTimeout` boolean which specified if the task is overdued already. callback function can return function itself. that hints the scheduler that the callback didn't completely finished
+what it had to do and it has to continue it. for example React might decide outside the scheduler that it has to run too many things which will take to long so it might partially execute it then return the function to the scheduler which will be executio of
+remaining elements.
+when the function is returned the callback field of task is reasigned to this function and the task is not removed from queue so it will be processed in next `workLoop`. If no function is returned the task is removed from the queue.
+
+And that's it finally after the while loop if there is still tasks in tasksQueue the workLoop is scheduled again. I will show the source code right now altough it might be intimidating that's basically what is happening I will add main comments
+in the code so you can better understand
+
+```ts
+function workLoop(initialTime: number) {
+  let currentTime = initialTime;
+  advanceTimers(currentTime);
+  currentTask = peek(taskQueue);
+  while (currentTask !== null) {
+    // This checks wheter it is time to handle execution to the browser
+    // shouldYieldToHost implements that logic
+    // it shouldn't be done if the task is overdue then this task should be xexuted
+    if (currentTask.expirationTime > currentTime && shouldYieldToHost()) {
+      break;
+    }
+    const callback = currentTask.callback;
+    // if callback is function, if not it might be null and then it means to remove it from the taskQueue
+    if (typeof callback === "function") {
+      currentTask.callback = null;
+      currentPriorityLevel = currentTask.priorityLevel;
+      const didUserCallbackTimeout = currentTask.expirationTime <= currentTime;
+      // callback execution
+      const continuationCallback = callback(didUserCallbackTimeout);
+      currentTime = getCurrentTime();
+      // continuiationCallback is returned it means the task has to run again after next cycle
+      if (typeof continuationCallback === "function") {
+        currentTask.callback = continuationCallback;
+
+        advanceTimers(currentTime);
+        return true;
+      } else {
+        //otherwise task is removed
+        if (currentTask === peek(taskQueue)) {
+          pop(taskQueue);
+        }
+        advanceTimers(currentTime);
+      }
+    } else {
+      pop(taskQueue);
+    }
+    currentTask = peek(taskQueue);
+  }
+  // if there is still task then true is returned which will make outside function to schedule the workLoop again
+  if (currentTask !== null) {
+    return true;
+  } else {
+    // otherwise timersQueue is checked once again to schedule the hostTimeotu
+    const firstTimer = peek(timerQueue);
+    if (firstTimer !== null) {
+      requestHostTimeout(handleTimeout, firstTimer.startTime - currentTime);
+    }
+    return false;
+  }
+}
+```
+
+Now let's see how the browser handle logic is implemented, it is happening in `shouldYieldToHost` function. basically what is happening is that this function checks if specific time has elapsed and if yes then it is time to
+to give browser time to execute.
+
+```ts
+function shouldYieldToHost(): boolean {
+  if (!enableRequestPaint && needsPaint) {
+    // Yield now.
+    return true;
+  }
+  const timeElapsed = getCurrentTime() - startTime;
+  if (timeElapsed < frameInterval) {
+    // The main thread has only been blocked for a really short amount of time;
+    // smaller than a single frame. Don't yield yet.
+    return false;
+  }
+  // Yield now.
+  return true;
+}
+```
+
+it's pretty easy check frameInterval value is constant and it is 5. also there is a `needsPaint` check, basically it is explicit check so React can call `requestPaint` outside from scheduler which will stop the workLoop automatically.
+and that's brieflly wraps up the the `workLoop`.
+
+and finall topic I want to describe is how the task is removed from the quueue. Because of the mini-heap structure, it wont be efficient to remove task from the queue arrary explicitely to remove it from execution unless it is the first item in array.
+so if item is the first item it is removed right away, because it will. be the highest prioirty item, but if it is somewhere else then it would be inefficient to remove it, so what's happening is that the when task needs to be removed
+the callback value is set to null and then when workLoop runs before executing the task it is checked if it is function and if not that means the task needs to be removed and it is removed from the queue, the public function to cancel the task is called
+`cancelCallback` and it is trivial as it gets
+
+```ts
+function cancelCallback(task: Task) {
+  task.callback = null;
+}
+```
+
+
+And that's it. We covered the schedule functionality. Now this ends the theory part if you are curious how exactly source code is implemented line by line you can go and read the chapters inside source code group where each and every function
+is explained in detail.

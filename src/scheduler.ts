@@ -1,24 +1,24 @@
 import type { PriorityLevel } from "./priorities.ts";
 
 import {
+  enableRequestPaint,
   frameYieldMs,
-  userBlockingPriorityTimeout,
   lowPriorityTimeout,
   normalPriorityTimeout,
-  enableRequestPaint,
+  userBlockingPriorityTimeout,
 } from "./flags.ts";
 
-import { push, pop, peek } from "./mini-heap.ts";
+import { peek, pop, push } from "./mini-heap.ts";
 
 declare var setImmediate: any;
 
 // TODO: Use symbols?
 import {
-  ImmediatePriority,
-  UserBlockingPriority,
-  NormalPriority,
-  LowPriority,
   IdlePriority,
+  ImmediatePriority,
+  LowPriority,
+  NormalPriority,
+  UserBlockingPriority,
 } from "./priorities.ts";
 
 type Callback = (arg: boolean) => Callback | null | undefined;
@@ -482,19 +482,6 @@ function cancelHostTimeout() {
 }
 
 export {
-  ImmediatePriority as ImmediatePriority,
-  UserBlockingPriority as UserBlockingPriority,
-  NormalPriority as NormalPriority,
-  IdlePriority as IdlePriority,
-  LowPriority as LowPriority,
-  runWithPriority,
-  next,
-  scheduleCallback,
-  cancelCallback,
-  wrapCallback,
-  getCurrentPriorityLevel,
-  shouldYieldToHost as shouldYield,
-  requestPaint as requestPaint,
-  getCurrentTime as now,
-  forceFrameRate as forceFrameRate,
+  cancelCallback, forceFrameRate as forceFrameRate, getCurrentPriorityLevel, IdlePriority as IdlePriority, ImmediatePriority as ImmediatePriority, LowPriority as LowPriority, next, NormalPriority as NormalPriority, getCurrentTime as now, requestPaint as requestPaint, runWithPriority, scheduleCallback, shouldYieldToHost as shouldYield, UserBlockingPriority as UserBlockingPriority, wrapCallback
 };
+
