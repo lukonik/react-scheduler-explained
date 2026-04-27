@@ -4,9 +4,33 @@ title: Introduction
 
 # Introduction
 
-JavaScript is a single-threaded language, meaning code runs synchronously on a single thread.
-In addition to performing computations to keep the page smooth, the browser must render a frame every 16 milliseconds, leaving application code very little time to execute.
-From this perspective, React has roughly a 16 ms window to move from state A to state B on each update. This is rarely achievable in applications with thousands of nodes.
-The React Scheduler was designed to address this constraint. It queues tasks (work) and executes them efficiently without blocking the browser’s critical operations. It also prioritizes tasks so that more important ones run first.
-For example, a user scroll event handler can run before list items are rendered, even if the render was triggered earlier in the code. Both tasks cooperatively yield to the browser, allowing it to handle essential work and maintain a smooth user experience.
-In these chapters we will explore interesting techniques, how React team was able to break syncrhnoous nature of javascript and implement efficient task scheduler that can even be used without React in pure javascript.
+JavaScript on the browser's main thread runs one piece of work at a time. While a JavaScript function is executing, the browser cannot interrupt it halfway through to paint the screen, handle input, or run layout.
+
+That matters because smooth interfaces have a limited frame budget. On a 60Hz display, the browser has about `16.67ms` to produce the next frame. That time is shared by JavaScript, style calculation, layout, painting, and other browser work. If React spends too much of that budget rendering an update, the page can feel delayed or unresponsive.
+
+## The Scheduling Problem
+
+React updates can involve a large amount of work: walking Fiber nodes, comparing props and state, preparing effects, and eventually committing changes to the host environment. In a complex application, doing all of that in one uninterrupted pass can block the main thread for longer than the browser can comfortably afford.
+
+The React Scheduler exists to manage that pressure. It does not make JavaScript parallel, and it does not break the synchronous nature of the language. Instead, it organizes work into tasks, assigns priorities, runs the most important work first, and cooperatively yields so the browser gets opportunities to handle its own responsibilities.
+
+## Why Priority Matters
+
+Not all work is equally urgent. A response to user input should usually run before background rendering or deferred work. For example, a scroll or typing interaction should stay responsive even if a larger render was scheduled earlier.
+
+Scheduler helps React make that distinction. It tracks priority and expiration time so urgent work can move ahead, while less urgent work can wait for a later time slice.
+
+## What You Will Learn
+
+These chapters explain the ideas behind React's internal Scheduler through a small TypeScript implementation that can be studied outside React itself.
+
+You will learn how Scheduler:
+
+- represents work as tasks
+- stores ready work and delayed work in separate queues
+- uses priority to calculate expiration times
+- schedules host callbacks through browser and runtime APIs
+- yields between chunks of work to avoid blocking the main thread
+- resumes unfinished work without losing its priority
+
+The goal is not only to understand the code line by line. The goal is to understand the design: how React makes progress on large updates while still leaving room for the browser to keep the interface responsive.

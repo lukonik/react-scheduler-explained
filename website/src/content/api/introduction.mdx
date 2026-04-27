@@ -4,41 +4,62 @@ title: Introduction
 
 # Introduction
 
-this documentation is for the `react-scheduler` package. this is basically the package that is created from React scheduler source code.
-converted from flow to typescript and removed the parts that are only for debugging and testing purposes. So every core functionality
-is included in React Scheduler. Even though it is a copy from the React scheduler, it shouldn't be used in a production environment, because it won't be supported and maintained.
-or use it on your own judgement. No issues will be fixed nor adding new features. Main purpose of this package is to experiment with it and play with it
-to more understand the how react works internally. But I must admit the implementation and functionality is pretty awesome.
+This documentation covers `@lonik/react-scheduler-experimental`, a small package based on React's internal Scheduler implementation.
+
+The source has been converted from Flow to TypeScript and trimmed to focus on the runtime behavior that matters for learning: scheduling callbacks, assigning priorities, delaying work, yielding back to the host environment, and resuming unfinished tasks.
+
+## Purpose
+
+The goal of this package is educational. It gives you a readable way to study the scheduling model React uses internally without having to navigate the full React repository.
+
+You can use it to experiment with the core ideas behind React's Scheduler:
+
+- how work is represented as tasks
+- how priorities affect expiration times
+- how ready tasks and delayed tasks are stored
+- how Scheduler cooperatively yields so the browser can stay responsive
+- how unfinished work can continue in a later time slice
+
+## Production Use
+
+This package is not intended to be a production dependency. It is an experimental learning tool, not a supported replacement for React's official packages.
+
+The implementation follows the core behavior of React's Scheduler, but this package does not provide React's maintenance guarantees, compatibility testing, or long-term support. Use it for exploration, examples, and documentation, not for application-critical scheduling logic.
 
 ## Installation
 
-install the following package
+Install the package with npm:
 
 ```bash
-npm install @lonik/react-internal-experimental
+npm install @lonik/react-scheduler-experimental
 ```
 
-and now you can use the library
+## Basic Usage
+
+Import the priority constants and `scheduleCallback` from the package:
 
 ```ts
 import {
   scheduleCallback,
   UserBlockingPriority,
   NormalPriority,
-} from "@lonik/react-internal-experimental";
+} from "@lonik/react-scheduler-experimental";
 
 scheduleCallback(UserBlockingPriority, () => {
   console.log("Processing callback");
+  return null;
 });
 
-//delayed task
 scheduleCallback(
   NormalPriority,
   () => {
     console.log("Delayed work");
+    return null;
   },
   {
     delay: 200,
   },
 );
 ```
+
+The first callback is scheduled immediately with user-blocking priority. The second callback is delayed by `200ms`, so Scheduler stores it separately until its start time is reached. After that, it becomes a ready task and is processed according to its expiration time.
