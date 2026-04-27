@@ -8,6 +8,7 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import tailwindcss from "@tailwindcss/vite";
 import viteReact from "@vitejs/plugin-react";
 const config = defineConfig({
+  base: "/react-scheduler-explained/",
   optimizeDeps: {
     include: [
       "use-sync-external-store/shim",
@@ -23,7 +24,7 @@ const config = defineConfig({
       prerender: {
         enabled: true,
       },
-      sitemap: { enabled: true, host: "https://example.com/" },
+      sitemap: { enabled: true, host: "https://lukonik.github.io/react-scheduler-explained/" },
     }),
     viteReact(),
   ],
