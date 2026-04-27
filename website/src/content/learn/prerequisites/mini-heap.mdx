@@ -1,7 +1,205 @@
 ---
-title: Mini Heap
+title: Min Heap
 ---
 
-# Mini Heap
+# Min Heap
 
-Mini-heap
+A min-heap is a data structure that keeps the smallest item at the front.
+
+For Scheduler, "smallest" means "the task with the lowest `sortIndex`." That is useful because Scheduler often needs to answer one question quickly:
+
+> What is the next task I should look at?
+
+Instead of sorting the entire queue after every insertion, Scheduler stores tasks in a min-heap. This keeps the most important task at index `0` while making inserts and removals efficient.
+
+:::note
+The file in this project is named `mini-heap.ts`, but the data structure is a **min-heap**. "Min" means the minimum item is kept at the top.
+:::
+
+## The Heap Rule
+
+A min-heap follows one main rule:
+
+> Every parent must be smaller than or equal to its children.
+
+That rule does not mean the whole array is fully sorted. It only guarantees that the smallest item is at the root.
+
+For example, this is a valid min-heap:
+
+```txt
+        1
+      /   \
+     4     2
+    / \   /
+   8   5 3
+```
+
+The smallest value, `1`, is at the top. The rest of the values are not fully sorted, but every parent is smaller than its children.
+
+## Array Representation
+
+Heaps are often drawn as trees, but they are usually stored as arrays.
+
+The tree above can be stored like this:
+
+```txt
+[1, 4, 2, 8, 5, 3]
+```
+
+For any item at index `i`:
+
+- left child index: `2 * i + 1`
+- right child index: `2 * i + 2`
+- parent index: `Math.floor((i - 1) / 2)`
+
+The implementation uses bitwise operations for speed:
+
+```ts
+const parentIndex = (index - 1) >>> 1;
+```
+
+That is equivalent to integer division by two for this use case.
+
+## The Node Shape
+
+The heap implementation only needs two fields:
+
+```ts
+type Node = {
+  id: number;
+  sortIndex: number;
+};
+```
+
+`sortIndex` is the primary ordering value. `id` is used as a tie-breaker when two items have the same `sortIndex`.
+
+The comparison function makes that rule explicit:
+
+```ts
+function compare(a: Node, b: Node) {
+  const diff = a.sortIndex - b.sortIndex;
+  return diff !== 0 ? diff : a.id - b.id;
+}
+```
+
+If `a.sortIndex` is smaller, `a` should be closer to the root. If the `sortIndex` values are equal, the item with the smaller `id` wins.
+
+This matters for Scheduler because two tasks can have the same expiration time or start time. The `id` keeps ordering stable in that case.
+
+## Reading the Smallest Item with `peek`
+
+`peek` returns the root of the heap without removing it:
+
+```ts
+export function peek<T extends Node>(heap: Heap<T>): T | null {
+  return heap.length === 0 ? null : heap[0];
+}
+```
+
+Because the heap rule keeps the smallest item at index `0`, this operation is very cheap.
+
+Scheduler uses this to inspect the next ready task:
+
+```ts
+currentTask = peek(taskQueue);
+```
+
+It also uses it to inspect the earliest delayed task:
+
+```ts
+const firstTimer = peek(timerQueue);
+```
+
+## Adding an Item with `push`
+
+`push` inserts a new item at the end of the array:
+
+```ts
+export function push<T extends Node>(heap: Heap<T>, node: T): void {
+  const index = heap.length;
+  heap.push(node);
+  siftUp(heap, node, index);
+}
+```
+
+Adding at the end keeps the tree shape valid, but it may violate the heap rule. If the new item is smaller than its parent, it needs to move upward.
+
+That upward movement is called `siftUp`.
+
+## Restoring Order with `siftUp`
+
+`siftUp` compares the new item with its parent:
+
+```ts
+const parentIndex = (index - 1) >>> 1;
+const parent = heap[parentIndex];
+
+if (compare(parent, node) > 0) {
+  heap[parentIndex] = node;
+  heap[index] = parent;
+  index = parentIndex;
+}
+```
+
+If the parent is larger than the new item, they swap. This continues until the item reaches the root or finds a parent that is already smaller.
+
+This is how a newly scheduled high-priority task can move toward the front without sorting the entire queue.
+
+## Removing the Smallest Item with `pop`
+
+`pop` removes and returns the root:
+
+```ts
+export function pop<T extends Node>(heap: Heap<T>): T | null {
+  if (heap.length === 0) {
+    return null;
+  }
+
+  const first = heap[0];
+  const last = heap.pop();
+
+  if (last !== first) {
+    heap[0] = last;
+    siftDown(heap, last, 0);
+  }
+
+  return first;
+}
+```
+
+After the root is removed, the heap needs a new root. The implementation takes the last item in the array, places it at index `0`, and then moves it downward until the heap rule is restored.
+
+That downward movement is called `siftDown`.
+
+## Restoring Order with `siftDown`
+
+`siftDown` compares the current item with its children. If one of the children is smaller, the current item swaps with the smaller child.
+
+The loop only needs to visit items that can have children:
+
+```ts
+const halfLength = length >>> 1;
+
+while (index < halfLength) {
+  // Compare with children.
+}
+```
+
+Once the item is smaller than both children, the heap is valid again.
+
+## Why Scheduler Uses a Min-Heap
+
+Scheduler has two queues:
+
+- `taskQueue`: ready tasks ordered by `expirationTime`
+- `timerQueue`: delayed tasks ordered by `startTime`
+
+Both queues need the same basic behavior: keep the next relevant task at the front.
+
+A min-heap gives Scheduler that behavior efficiently:
+
+- `peek` reads the next task in constant time.
+- `push` inserts a task without a full sort.
+- `pop` removes the next task and restores order.
+
+This is why understanding a min-heap makes the Scheduler implementation much easier to read. The queue code is not trying to fully sort every task. It only keeps enough order to make the next task cheap to find.
