@@ -9,12 +9,6 @@ import tailwindcss from "@tailwindcss/vite";
 import viteReact from "@vitejs/plugin-react";
 const config = defineConfig({
   base: "/react-scheduler-explained/",
-  optimizeDeps: {
-    include: [
-      "use-sync-external-store/shim",
-      "use-sync-external-store/shim/with-selector",
-    ],
-  },
   plugins: [
     prestige(),
     devtools(),
