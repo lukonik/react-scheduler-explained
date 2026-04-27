@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@lonik/prestige": "0.14.0",
+    "@lonik/react-scheduler-experimental": "^0.0.2",
     "@tailwindcss/vite": "^4.2.1",
     "@tanstack/react-devtools": "0.9.6",
     "@tanstack/react-router": "^1.162.4",

@@ -11,6 +11,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ShowcaseRouteImport } from './routes/showcase'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as prestigeLearnOverviewRouteImport } from './routes/(prestige)/learn.overview'
 import { Route as prestigeLearnIntroductionRouteImport } from './routes/(prestige)/learn.introduction'
@@ -35,6 +36,11 @@ import { Route as prestigeLearnPrerequisitesEventLoopRouteImport } from './route
 const prestigeLearnLazyRouteImport = createFileRoute('/(prestige)/learn')()
 const prestigeApiLazyRouteImport = createFileRoute('/(prestige)/api')()
 
+const ShowcaseRoute = ShowcaseRouteImport.update({
+  id: '/showcase',
+  path: '/showcase',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -262,6 +268,7 @@ const prestigeLearnPrerequisitesEventLoopRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/showcase': typeof ShowcaseRoute
   '/api': typeof prestigeApiLazyRouteWithChildren
   '/learn': typeof prestigeLearnLazyRouteWithChildren
   '/api/api': typeof prestigeApiApiRoute
@@ -286,6 +293,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/showcase': typeof ShowcaseRoute
   '/api': typeof prestigeApiLazyRouteWithChildren
   '/learn': typeof prestigeLearnLazyRouteWithChildren
   '/api/api': typeof prestigeApiApiRoute
@@ -311,6 +319,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/showcase': typeof ShowcaseRoute
   '/(prestige)/api': typeof prestigeApiLazyRouteWithChildren
   '/(prestige)/learn': typeof prestigeLearnLazyRouteWithChildren
   '/(prestige)/api/api': typeof prestigeApiApiRoute
@@ -337,6 +346,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/showcase'
     | '/api'
     | '/learn'
     | '/api/api'
@@ -361,6 +371,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/showcase'
     | '/api'
     | '/learn'
     | '/api/api'
@@ -385,6 +396,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/showcase'
     | '/(prestige)/api'
     | '/(prestige)/learn'
     | '/(prestige)/api/api'
@@ -410,12 +422,20 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ShowcaseRoute: typeof ShowcaseRoute
   prestigeApiLazyRoute: typeof prestigeApiLazyRouteWithChildren
   prestigeLearnLazyRoute: typeof prestigeLearnLazyRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/showcase': {
+      id: '/showcase'
+      path: '/showcase'
+      fullPath: '/showcase'
+      preLoaderRoute: typeof ShowcaseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -640,6 +660,7 @@ const prestigeLearnLazyRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ShowcaseRoute: ShowcaseRoute,
   prestigeApiLazyRoute: prestigeApiLazyRouteWithChildren,
   prestigeLearnLazyRoute: prestigeLearnLazyRouteWithChildren,
 }
