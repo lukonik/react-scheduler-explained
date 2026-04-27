@@ -88,5 +88,19 @@ export default defineConfig({
         },
       ],
     },
+    {
+      id: "api",
+      label: "API",
+      items: [
+        {
+          label: "Introduction",
+          slug: "api/introduction",
+        },
+        {
+          label: "API",
+          slug: "api/api",
+        },
+      ],
+    },
   ],
 });

@@ -1,16 +1,13 @@
 {
-  "name": "vite-plus-starter",
+  "name": "@lonik/react-internal-scheduler-experimental",
   "version": "0.0.0",
   "description": "A starter for creating a TypeScript package.",
-  "homepage": "https://github.com/author/library#readme",
-  "bugs": {
-    "url": "https://github.com/author/library/issues"
-  },
+  "homepage": "https://github.com/lukonik/react-internal-scheduler",
   "license": "MIT",
   "author": "Author Name <author.name@mail.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/author/library.git"
+    "url": "git+https://github.com/lukonik/react-internal-scheduler.git"
   },
   "files": [
     "dist"
