@@ -27,7 +27,12 @@ Microtasks also matter here. They run before the browser gets a chance to paint,
 
 ## Yielding to the Browser
 
-This model makes it possible to delay the execution of certain code. For example, imagine you need to perform a heavy computation on an array and also update a button’s background color. If you write:
+This model makes it possible to delay the execution of certain code. For example, imagine you have two functions:
+
+- `setButtonBackgroundColor()` updates a button's background color.
+- `doHeavyComputation()` performs an expensive calculation that takes a long time to finish.
+
+If you write:
 
 ```js
 setButtonBackgroundColor()
@@ -35,9 +40,9 @@ setButtonBackgroundColor()
 doHeavyComputation()
 ```
 
-Even though the UI update comes first, it won’t be visible to the user immediately. Before the browser can repaint the frame, it must wait for your JavaScript to finish executing—meaning it has to complete `doHeavyComputation()`.
+Even though the UI update comes first, the main thread immediately moves into `doHeavyComputation()`. While that function is running, nothing else on the main thread can run: not your other JavaScript, not input handling, and not the browser's rendering work. The page is effectively blocked until the heavy computation finishes.
 
-A simple fix is to wrap `doHeavyComputation()` in `setTimeout`:
+You can delay that heavy computation by scheduling it with `setTimeout`:
 
 ```js
 setButtonBackgroundColor()
@@ -47,7 +52,9 @@ setTimeout(() => {
 }, 0)
 ```
 
-This schedules the computation as a separate task. The current task can finish, the browser gets an opportunity to repaint, and the heavy computation runs in a later event cycle.
+This puts `doHeavyComputation()` into a later task. The current task can finish first, which gives the browser a chance to continue through the event loop before the computation starts.
+
+However, this only delays the problem. At some point, `doHeavyComputation()` still has to run. If it runs as one long function, it will still block the main thread for its entire duration.
 
 ## Why This Matters for Scheduler
 
