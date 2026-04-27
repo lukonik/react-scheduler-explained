@@ -1,0 +1,333 @@
+---
+title: API
+---
+
+# API
+
+This package exposes a small, focused version of React's internal Scheduler API. The public entry point is `src/index.ts`, which re-exports everything from `src/scheduler.ts`.
+
+```ts
+import {
+  ImmediatePriority,
+  UserBlockingPriority,
+  NormalPriority,
+  LowPriority,
+  IdlePriority,
+  scheduleCallback,
+  cancelCallback,
+  runWithPriority,
+  next,
+  wrapCallback,
+  getCurrentPriorityLevel,
+  shouldYield,
+  requestPaint,
+  forceFrameRate,
+  now,
+  type Task,
+} from "@lonik/react-scheduler-experimental";
+```
+
+The API is useful for learning how React schedules work, assigns priorities, yields back to the host environment, and resumes unfinished tasks. It is not intended to be a stable production dependency.
+
+## Priority Constants
+
+Scheduler represents priority as a small number. Lower numbers mean higher priority.
+
+| Export | Value | Meaning |
+| --- | ---: | --- |
+| `ImmediatePriority` | `1` | Work that should be treated as already expired. |
+| `UserBlockingPriority` | `2` | Urgent work connected to user input, such as typing or clicking. |
+| `NormalPriority` | `3` | The default priority for ordinary work. |
+| `LowPriority` | `4` | Work that can wait longer than normal updates. |
+| `IdlePriority` | `5` | Work that should run only when more important work is not pending. |
+
+`NoPriority` exists in `src/priorities.ts`, but it is not exported from `src/index.ts`. It is a sentinel value, not a priority you schedule with through the public API.
+
+Internally, each priority is converted into a timeout:
+
+| Priority | Timeout |
+| --- | ---: |
+| `ImmediatePriority` | `-1ms` |
+| `UserBlockingPriority` | `250ms` |
+| `NormalPriority` | `5000ms` |
+| `LowPriority` | `10000ms` |
+| `IdlePriority` | `1073741823ms` |
+
+The timeout is added to the task's `startTime` to produce `expirationTime`. That expiration time is the deadline Scheduler uses to order ready tasks and decide whether a callback has timed out.
+
+## `scheduleCallback`
+
+```ts
+function scheduleCallback(
+  priorityLevel: 1 | 2 | 3 | 4 | 5,
+  callback: (didUserCallbackTimeout: boolean) => Callback | null | undefined,
+  options?: { delay: number },
+): Task;
+```
+
+Schedules a unit of work and returns the created `Task`.
+
+```ts
+const task = scheduleCallback(UserBlockingPriority, didTimeout => {
+  if (didTimeout) {
+    // The task has passed its expiration time.
+  }
+
+  doSomeWork();
+  return null;
+});
+```
+
+`scheduleCallback` does not run the callback immediately. It creates a task, computes its timing fields, places it into the correct heap, and requests host work if needed.
+
+If `options.delay` is a positive number, the task is delayed. Delayed tasks go into `timerQueue` and are sorted by `startTime`. Once the delay has elapsed, Scheduler moves the task into `taskQueue`, where ready tasks are sorted by `expirationTime`.
+
+The callback receives `didUserCallbackTimeout`. Scheduler passes `true` when the task's `expirationTime` is less than or equal to the current time. React can use that signal to finish overdue work without yielding.
+
+The callback may return another callback:
+
+```ts
+scheduleCallback(NormalPriority, () => {
+  doFirstChunk();
+
+  return () => {
+    doSecondChunk();
+    return null;
+  };
+});
+```
+
+That returned function is called a continuation. Scheduler stores it on the same task and keeps the task in the queue so the work can resume later.
+
+## `cancelCallback`
+
+```ts
+function cancelCallback(task: Task): void;
+```
+
+Cancels a task returned by `scheduleCallback`.
+
+```ts
+const task = scheduleCallback(NormalPriority, () => {
+  saveDraft();
+  return null;
+});
+
+cancelCallback(task);
+```
+
+Cancellation is lazy. Scheduler does not remove the task from the heap immediately because an array-based heap can efficiently remove only the first item. Instead, it sets `task.callback` to `null`. When Scheduler later reaches that task, it sees that the callback is missing and discards the task.
+
+## `runWithPriority`
+
+```ts
+function runWithPriority<T>(
+  priorityLevel: 1 | 2 | 3 | 4 | 5,
+  eventHandler: () => T,
+): T;
+```
+
+Temporarily changes the current priority while a synchronous function runs.
+
+```ts
+runWithPriority(UserBlockingPriority, () => {
+  scheduleCallback(getCurrentPriorityLevel(), () => {
+    updateInputState();
+    return null;
+  });
+});
+```
+
+The previous priority is restored after `eventHandler` finishes, even if it throws. If an invalid priority is passed, this implementation falls back to `NormalPriority`.
+
+`runWithPriority` does not schedule work by itself. It only changes the priority context used by code that runs inside the callback.
+
+## `next`
+
+```ts
+function next<T>(eventHandler: () => T): T;
+```
+
+Runs a synchronous function at the next lower scheduling context.
+
+```ts
+runWithPriority(UserBlockingPriority, () => {
+  next(() => {
+    // Current priority is NormalPriority here.
+  });
+});
+```
+
+`next` prevents highly urgent work from accidentally making every nested operation equally urgent. If the current priority is `ImmediatePriority`, `UserBlockingPriority`, or `NormalPriority`, `next` runs the function at `NormalPriority`. If the current priority is already `LowPriority` or `IdlePriority`, it keeps that lower priority.
+
+As with `runWithPriority`, the previous priority is restored after the function completes.
+
+## `wrapCallback`
+
+```ts
+function wrapCallback<T extends (...args: any[]) => any>(callback: T): T;
+```
+
+Captures the current priority and returns a new function that restores that priority whenever it runs.
+
+```ts
+const wrapped = runWithPriority(UserBlockingPriority, () => {
+  return wrapCallback(() => {
+    scheduleCallback(getCurrentPriorityLevel(), () => {
+      updateFromEvent();
+      return null;
+    });
+  });
+});
+
+setTimeout(wrapped, 100);
+```
+
+This is useful when work crosses an async boundary. The original priority context would normally be lost by the time the callback runs later. `wrapCallback` preserves it.
+
+## `getCurrentPriorityLevel`
+
+```ts
+function getCurrentPriorityLevel(): 1 | 2 | 3 | 4 | 5;
+```
+
+Returns the priority currently active in Scheduler's execution context.
+
+```ts
+const priority = getCurrentPriorityLevel();
+```
+
+By default, the current priority is `NormalPriority`. During scheduled work, Scheduler sets it to the running task's priority. During `runWithPriority`, `next`, or `wrapCallback`, it reflects the temporary priority context created by those APIs.
+
+## `shouldYield`
+
+```ts
+function shouldYield(): boolean;
+```
+
+Returns whether Scheduler should yield control back to the host environment.
+
+Scheduler uses this during `workLoop` to avoid blocking the main thread for too long:
+
+```ts
+if (currentTask.expirationTime > currentTime && shouldYield()) {
+  break;
+}
+```
+
+This implementation starts with a `5ms` frame interval. If the current slice of work has run for less than that interval, `shouldYield()` returns `false`. Once the interval has elapsed, it returns `true`.
+
+Expired tasks are handled specially by the work loop. If a task has already passed its expiration time, Scheduler continues running it even when `shouldYield()` is true. That is how overdue work can finish without being interrupted by normal time slicing.
+
+## `requestPaint`
+
+```ts
+function requestPaint(): void;
+```
+
+Records that the host should be given a chance to paint.
+
+In React's Scheduler, this API is used as a hint that rendering work should yield soon so the browser can paint. In this implementation, `requestPaint` sets an internal `needsPaint` flag when `enableRequestPaint` is enabled. The main yielding behavior is still governed by the frame interval used by `shouldYield`.
+
+## `forceFrameRate`
+
+```ts
+function forceFrameRate(fps: number): void;
+```
+
+Adjusts the interval Scheduler uses before yielding.
+
+```ts
+forceFrameRate(60); // about 16ms per slice
+forceFrameRate(0);  // reset to the default 5ms interval
+```
+
+Passing a positive value sets `frameInterval` to `Math.floor(1000 / fps)`. Passing `0` resets the interval to the default `5ms`.
+
+Values below `0` or above `125` are rejected. In that case, Scheduler logs an error and keeps the existing interval.
+
+## `now`
+
+```ts
+function now(): number | DOMHighResTimeStamp;
+```
+
+Returns Scheduler's current time value.
+
+```ts
+const start = now();
+```
+
+When `performance.now()` is available, Scheduler uses it because it is high resolution and monotonic. Otherwise, it falls back to `Date.now()` minus the time captured when the module initialized. The fallback keeps the returned value relative instead of returning a full Unix timestamp.
+
+Scheduler uses this clock to compute `startTime`, `expirationTime`, delay handling, and the elapsed time for `shouldYield`.
+
+## `Task`
+
+```ts
+type Task = {
+  id: number;
+  callback: Callback | null;
+  priorityLevel: PriorityLevel;
+  startTime: number;
+  expirationTime: number;
+  sortIndex: number;
+};
+```
+
+`Task` is the only exported type from `src/scheduler.ts`. It is the object returned by `scheduleCallback` and accepted by `cancelCallback`.
+
+| Field | Meaning |
+| --- | --- |
+| `id` | Incrementing task id. It preserves insertion order when two tasks have the same sort value. |
+| `callback` | The work function Scheduler will run, or `null` after the task is cancelled or while it is being processed. |
+| `priorityLevel` | The priority assigned when the task was scheduled. |
+| `startTime` | The earliest time the task is allowed to run. |
+| `expirationTime` | The deadline after which the task is considered timed out. |
+| `sortIndex` | The value used by the heap to order the task. It means `startTime` in `timerQueue` and `expirationTime` in `taskQueue`. |
+
+`PriorityLevel` and `Callback` are internal helper types in this project. They appear in the shape of `Task`, but they are not exported as named types from `src/index.ts`.
+
+## Common Flow
+
+A typical interaction with Scheduler looks like this:
+
+```ts
+import {
+  NormalPriority,
+  UserBlockingPriority,
+  cancelCallback,
+  getCurrentPriorityLevel,
+  runWithPriority,
+  scheduleCallback,
+} from "@lonik/react-scheduler-experimental";
+
+runWithPriority(UserBlockingPriority, () => {
+  const priority = getCurrentPriorityLevel();
+
+  scheduleCallback(priority, didTimeout => {
+    handleInput(didTimeout);
+    return null;
+  });
+});
+
+const backgroundTask = scheduleCallback(
+  NormalPriority,
+  () => {
+    preloadData();
+    return null;
+  },
+  { delay: 500 },
+);
+
+cancelCallback(backgroundTask);
+```
+
+The important sequence is:
+
+1. Choose a priority.
+2. Schedule a callback.
+3. Scheduler converts priority into an expiration time.
+4. Ready work goes into `taskQueue`; delayed work starts in `timerQueue`.
+5. The host callback eventually enters the work loop.
+6. Scheduler runs callbacks until the queue is empty, the current slice should yield, or a continuation asks to resume later.

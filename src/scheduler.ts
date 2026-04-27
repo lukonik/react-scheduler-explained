@@ -482,6 +482,19 @@ function cancelHostTimeout() {
 }
 
 export {
-  cancelCallback, forceFrameRate as forceFrameRate, getCurrentPriorityLevel, IdlePriority as IdlePriority, ImmediatePriority as ImmediatePriority, LowPriority as LowPriority, next, NormalPriority as NormalPriority, getCurrentTime as now, requestPaint as requestPaint, runWithPriority, scheduleCallback, shouldYieldToHost as shouldYield, UserBlockingPriority as UserBlockingPriority, wrapCallback
+  cancelCallback,
+  forceFrameRate as forceFrameRate,
+  getCurrentPriorityLevel,
+  IdlePriority as IdlePriority,
+  ImmediatePriority as ImmediatePriority,
+  LowPriority as LowPriority,
+  next,
+  NormalPriority as NormalPriority,
+  getCurrentTime as now,
+  requestPaint as requestPaint,
+  runWithPriority,
+  scheduleCallback,
+  shouldYieldToHost as shouldYield,
+  UserBlockingPriority as UserBlockingPriority,
+  wrapCallback,
 };
-
