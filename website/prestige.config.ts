@@ -36,6 +36,10 @@ export default defineConfig({
           label: "Theory",
           items: [
             {
+              label: "Theory",
+              slug: "learn/theory/theory",
+            },
+            {
               label: "Queues",
               slug: "learn/theory/queues",
             },
@@ -54,35 +58,35 @@ export default defineConfig({
           ],
         },
         {
-          label: "Scheduler",
+          label: "Source Code",
           items: [
             {
               label: "Scheduler Intro",
-              slug: "learn/schedulers/scheduler-intro",
+              slug: "learn/source-code/scheduler-intro",
             },
             {
               label: "scheduleCallback",
-              slug: "learn/schedulers/scheduleCallback",
+              slug: "learn/source-code/scheduleCallback",
             },
             {
               label: "workLoop",
-              slug: "learn/schedulers/workLoop",
+              slug: "learn/source-code/workLoop",
             },
             {
               label: "requestHostCallback",
-              slug: "learn/schedulers/requestHostCallback",
+              slug: "learn/source-code/requestHostCallback",
             },
             {
               label: "schedulePerformWorkUntilDeadline",
-              slug: "learn/schedulers/schedulePerformWorkUntilDeadline",
+              slug: "learn/source-code/schedulePerformWorkUntilDeadline",
             },
             {
               label: "performWorkUntilDeadline",
-              slug: "learn/schedulers/performWorkUntilDeadline",
+              slug: "learn/source-code/performWorkUntilDeadline",
             },
             {
               label: "flushWork",
-              slug: "learn/schedulers/flushWork",
+              slug: "learn/source-code/flushWork",
             },
           ],
         },
