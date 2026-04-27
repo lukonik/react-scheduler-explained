@@ -12,6 +12,7 @@ import { createFileRoute } from '@tanstack/react-router'
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as prestigeLearnOverviewRouteImport } from './routes/(prestige)/learn.overview'
 import { Route as prestigeLearnIntroductionRouteImport } from './routes/(prestige)/learn.introduction'
 import { Route as prestigeApiIntroductionRouteImport } from './routes/(prestige)/api.introduction'
 import { Route as prestigeApiApiRouteImport } from './routes/(prestige)/api.api'
@@ -53,6 +54,15 @@ const prestigeApiLazyRoute = prestigeApiLazyRouteImport
     getParentRoute: () => rootRouteImport,
   } as any)
   .lazy(() => import('./routes/(prestige)/api.lazy').then((d) => d.Route))
+const prestigeLearnOverviewRoute = prestigeLearnOverviewRouteImport
+  .update({
+    id: '/overview',
+    path: '/overview',
+    getParentRoute: () => prestigeLearnLazyRoute,
+  } as any)
+  .lazy(() =>
+    import('./routes/(prestige)/learn.overview.lazy').then((d) => d.Route),
+  )
 const prestigeLearnIntroductionRoute = prestigeLearnIntroductionRouteImport
   .update({
     id: '/introduction',
@@ -257,6 +267,7 @@ export interface FileRoutesByFullPath {
   '/api/api': typeof prestigeApiApiRoute
   '/api/introduction': typeof prestigeApiIntroductionRoute
   '/learn/introduction': typeof prestigeLearnIntroductionRoute
+  '/learn/overview': typeof prestigeLearnOverviewRoute
   '/learn/prerequisites/event-loop': typeof prestigeLearnPrerequisitesEventLoopRoute
   '/learn/prerequisites/mini-heap': typeof prestigeLearnPrerequisitesMiniHeapRoute
   '/learn/prerequisites/prerequisites': typeof prestigeLearnPrerequisitesPrerequisitesRoute
@@ -280,6 +291,7 @@ export interface FileRoutesByTo {
   '/api/api': typeof prestigeApiApiRoute
   '/api/introduction': typeof prestigeApiIntroductionRoute
   '/learn/introduction': typeof prestigeLearnIntroductionRoute
+  '/learn/overview': typeof prestigeLearnOverviewRoute
   '/learn/prerequisites/event-loop': typeof prestigeLearnPrerequisitesEventLoopRoute
   '/learn/prerequisites/mini-heap': typeof prestigeLearnPrerequisitesMiniHeapRoute
   '/learn/prerequisites/prerequisites': typeof prestigeLearnPrerequisitesPrerequisitesRoute
@@ -304,6 +316,7 @@ export interface FileRoutesById {
   '/(prestige)/api/api': typeof prestigeApiApiRoute
   '/(prestige)/api/introduction': typeof prestigeApiIntroductionRoute
   '/(prestige)/learn/introduction': typeof prestigeLearnIntroductionRoute
+  '/(prestige)/learn/overview': typeof prestigeLearnOverviewRoute
   '/(prestige)/learn/prerequisites/event-loop': typeof prestigeLearnPrerequisitesEventLoopRoute
   '/(prestige)/learn/prerequisites/mini-heap': typeof prestigeLearnPrerequisitesMiniHeapRoute
   '/(prestige)/learn/prerequisites/prerequisites': typeof prestigeLearnPrerequisitesPrerequisitesRoute
@@ -329,6 +342,7 @@ export interface FileRouteTypes {
     | '/api/api'
     | '/api/introduction'
     | '/learn/introduction'
+    | '/learn/overview'
     | '/learn/prerequisites/event-loop'
     | '/learn/prerequisites/mini-heap'
     | '/learn/prerequisites/prerequisites'
@@ -352,6 +366,7 @@ export interface FileRouteTypes {
     | '/api/api'
     | '/api/introduction'
     | '/learn/introduction'
+    | '/learn/overview'
     | '/learn/prerequisites/event-loop'
     | '/learn/prerequisites/mini-heap'
     | '/learn/prerequisites/prerequisites'
@@ -375,6 +390,7 @@ export interface FileRouteTypes {
     | '/(prestige)/api/api'
     | '/(prestige)/api/introduction'
     | '/(prestige)/learn/introduction'
+    | '/(prestige)/learn/overview'
     | '/(prestige)/learn/prerequisites/event-loop'
     | '/(prestige)/learn/prerequisites/mini-heap'
     | '/(prestige)/learn/prerequisites/prerequisites'
@@ -420,6 +436,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api'
       preLoaderRoute: typeof prestigeApiLazyRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/(prestige)/learn/overview': {
+      id: '/(prestige)/learn/overview'
+      path: '/overview'
+      fullPath: '/learn/overview'
+      preLoaderRoute: typeof prestigeLearnOverviewRouteImport
+      parentRoute: typeof prestigeLearnLazyRoute
     }
     '/(prestige)/learn/introduction': {
       id: '/(prestige)/learn/introduction'
@@ -566,6 +589,7 @@ const prestigeApiLazyRouteWithChildren = prestigeApiLazyRoute._addFileChildren(
 
 interface prestigeLearnLazyRouteChildren {
   prestigeLearnIntroductionRoute: typeof prestigeLearnIntroductionRoute
+  prestigeLearnOverviewRoute: typeof prestigeLearnOverviewRoute
   prestigeLearnPrerequisitesEventLoopRoute: typeof prestigeLearnPrerequisitesEventLoopRoute
   prestigeLearnPrerequisitesMiniHeapRoute: typeof prestigeLearnPrerequisitesMiniHeapRoute
   prestigeLearnPrerequisitesPrerequisitesRoute: typeof prestigeLearnPrerequisitesPrerequisitesRoute
@@ -585,6 +609,7 @@ interface prestigeLearnLazyRouteChildren {
 
 const prestigeLearnLazyRouteChildren: prestigeLearnLazyRouteChildren = {
   prestigeLearnIntroductionRoute: prestigeLearnIntroductionRoute,
+  prestigeLearnOverviewRoute: prestigeLearnOverviewRoute,
   prestigeLearnPrerequisitesEventLoopRoute:
     prestigeLearnPrerequisitesEventLoopRoute,
   prestigeLearnPrerequisitesMiniHeapRoute:

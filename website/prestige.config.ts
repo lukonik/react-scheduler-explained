@@ -12,6 +12,10 @@ export default defineConfig({
       id: "learn",
       items: [
         {
+          label: "Overview",
+          slug: "learn/overview",
+        },
+        {
           label: "Introduction",
           slug: "learn/introduction",
         },
