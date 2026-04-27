@@ -5,12 +5,27 @@ title: Event Loop
 # Event Loop
 
 :::note
-This is a simplified explanation of the event loop, focused on what matters for the Scheduler. If you want a deeper dive, check out this excellent [video](https://www.youtube.com/watch?v=8aGhZQkoFbQ). Every second of it is worth watching.
+This is a simplified explanation of the event loop, focused on the parts that matter for the Scheduler. For a deeper visual explanation, this [video](https://www.youtube.com/watch?v=8aGhZQkoFbQ) is an excellent resource.
 :::
 
-JavaScript runs on an event loop. When something happens—for example, a user clicks a button and a handler is attached—that handler is added to a queue. When the time comes, the browser executes it.
+JavaScript on the browser's main thread is single-threaded: only one piece of JavaScript runs at a time. The event loop is the mechanism that lets the browser decide what should run next after the current JavaScript call stack becomes empty.
 
-The callback queue can contain different types of tasks, such as server response callbacks, `setTimeout` callbacks, and event handlers. The browser prioritizes these tasks and executes them sequentially.
+When something happens, such as a user click, a timer firing, or a message being posted, the browser schedules a callback as a task. Once the current task finishes, the event loop picks another task and executes it.
+
+## Event Cycle
+
+An event cycle, often called a tick or a turn of the event loop, is one pass through the event loop. In a simplified browser model, each cycle looks like this:
+
+1. Take one task from a task queue and run it to completion.
+2. Run all queued microtasks, such as callbacks scheduled with `queueMicrotask` or resolved `Promise` handlers.
+3. Give the browser an opportunity to update rendering, including style calculation, layout, and paint.
+4. Move to the next cycle and choose another task.
+
+The important detail is that rendering cannot happen while JavaScript is still running. If a task takes too long, the browser cannot process input or paint the next frame until that task finishes.
+
+Microtasks also matter here. They run before the browser gets a chance to paint, so moving heavy work into a microtask does not help the UI become responsive. A long chain of microtasks can block rendering just like a long synchronous function.
+
+## Yielding to the Browser
 
 This model makes it possible to delay the execution of certain code. For example, imagine you need to perform a heavy computation on an array and also update a button’s background color. If you write:
 
@@ -22,6 +37,24 @@ doHeavyComputation()
 
 Even though the UI update comes first, it won’t be visible to the user immediately. Before the browser can repaint the frame, it must wait for your JavaScript to finish executing—meaning it has to complete `doHeavyComputation()`.
 
-A simple fix is to wrap `doHeavyComputation()` in `setTimeout`. This schedules the computation as a separate task, allowing the browser to first run `setButtonBackgroundColor()`, repaint the UI, and then execute the delayed computation on the next tick.
+A simple fix is to wrap `doHeavyComputation()` in `setTimeout`:
 
-In addition to `setTimeout`, there are other APIs that schedule callbacks at different stages of the event loop, such as `queueMicrotask`, `setImmediate`, and `BroadcastChannel.postMessage`. Depending on the situation, one may be more appropriate than the others.
+```js
+setButtonBackgroundColor()
+
+setTimeout(() => {
+  doHeavyComputation()
+}, 0)
+```
+
+This schedules the computation as a separate task. The current task can finish, the browser gets an opportunity to repaint, and the heavy computation runs in a later event cycle.
+
+## Why This Matters for Scheduler
+
+React Scheduler uses this behavior to split work into smaller chunks. Instead of running every scheduled callback in one long task, it performs work for a limited amount of time, yields back to the host environment, and schedules the remaining work for a later event cycle.
+
+That yield is what gives the browser a chance to handle user input, paint updates, and keep the page responsive.
+
+Scheduler can use different host APIs to schedule its next chunk of work. In this codebase, it prefers `setImmediate` when available, then `MessageChannel.postMessage`, and finally falls back to `setTimeout`. `MessageChannel` is preferred over `setTimeout` in browsers because zero-delay timers can be clamped, which makes them slower for repeatedly scheduling small chunks of work.
+
+Scheduler does not use `queueMicrotask` for this job because microtasks run before paint. If Scheduler kept continuing work through microtasks, it could prevent the browser from rendering, which defeats the purpose of yielding.
