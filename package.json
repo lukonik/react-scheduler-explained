@@ -1,13 +1,13 @@
 {
-  "name": "@lonik/react-internal-scheduler-experimental",
-  "version": "0.0.0",
-  "description": "A starter for creating a TypeScript package.",
-  "homepage": "https://github.com/lukonik/react-internal-scheduler",
+  "name": "@lonik/react-scheduler-experimental",
+  "version": "0.0.1",
+  "description": "React scheduler package.",
+  "homepage": "https://github.com/lukonik/react-scheduler-explained",
   "license": "MIT",
-  "author": "Author Name <author.name@mail.com>",
+  "author": "Author Name lukaonik@gmail.com",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lukonik/react-internal-scheduler.git"
+    "url": "git+https://github.com/lukonik/react-scheduler-explained.git"
   },
   "files": [
     "dist"
