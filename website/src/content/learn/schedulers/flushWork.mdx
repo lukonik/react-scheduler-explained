@@ -1,13 +1,15 @@
-# FlushWork
+---
+title: flushWork
+---
 
-FlushWorks calls the workLoop internally and does some preconfigure and cleanup job, this is the source code
+# flushWork
+
+`flushWork` is a wrapper around `workLoop`. It prepares Scheduler's global state before work starts and restores that state afterward.
 
 ```ts
 function flushWork(initialTime: number) {
-  // We'll need a host callback the next time work is scheduled.
   isHostCallbackScheduled = false;
   if (isHostTimeoutScheduled) {
-    // We scheduled a timeout but it's no longer needed. Cancel it.
     isHostTimeoutScheduled = false;
     cancelHostTimeout();
   }
@@ -24,17 +26,65 @@ function flushWork(initialTime: number) {
 }
 ```
 
-the isHostCallbackScheduled is reseted because workLoop has begun, also if timeout is scheduled it is cancelled as well, timeout schedule is scheduler
-that checks timerQueue it is canceled because workLoop will check timersQueue itself.
-then performingWork is set tot true
+## Resetting Host Callback State
 
-the previousPriorityLevel is set to the currentLevel which is used to restore currentPriorityLevel after workLoop finishes execution
-thats because currentPriorityLevel is updated per task in workLoop and if the error happens or the workLoop is break because of browser previousPriorityLevel
-the global currentPriorityLevel will be leaked to the currentTask to avoid this it is restored whatever was before the workLoop execution.
+The first line clears `isHostCallbackScheduled`:
 
-so the workLoop is executed the return value of workLoop is either there is more work to be done or not to reschedule again the workLoop
-and finally cleansup the global variable, as I said to avoid leakage same thing for currentTask.
+```ts
+isHostCallbackScheduled = false;
+```
 
-and this is how scheduler goes from adding calling requestCallback to add the task to the workLoop which executes the task.
-we are almost finished the only left are to understand the scheduling of timeout which works on timersQueue and some utlity priority level functions that are handy for react.
-let's first discuss the timeout
+The scheduled host callback has now started running, so Scheduler can allow a future host callback to be scheduled if more work is added later.
+
+## Cancelling an Unneeded Host Timeout
+
+Next, Scheduler cancels a pending host timeout if one exists:
+
+```ts
+if (isHostTimeoutScheduled) {
+  isHostTimeoutScheduled = false;
+  cancelHostTimeout();
+}
+```
+
+Host timeouts are used to wake Scheduler when delayed tasks become ready. But if `flushWork` is already running, `workLoop` will call `advanceTimers` and check `timerQueue` itself. The pending timeout may no longer be necessary.
+
+## Protecting Against Re-entrance
+
+Before calling `workLoop`, Scheduler marks that work is currently being performed:
+
+```ts
+isPerformingWork = true;
+```
+
+`scheduleCallback` checks this flag before requesting another host callback:
+
+```ts
+if (!isHostCallbackScheduled && !isPerformingWork) {
+  isHostCallbackScheduled = true;
+  requestHostCallback();
+}
+```
+
+If new work is scheduled while Scheduler is already inside `workLoop`, Scheduler avoids posting a duplicate host callback immediately. The existing loop or the next scheduled slice will pick it up.
+
+## Restoring Priority State
+
+`workLoop` changes `currentPriorityLevel` while it executes each task. `flushWork` saves the previous priority and restores it in `finally`:
+
+```ts
+const previousPriorityLevel = currentPriorityLevel;
+try {
+  return workLoop(initialTime);
+} finally {
+  currentTask = null;
+  currentPriorityLevel = previousPriorityLevel;
+  isPerformingWork = false;
+}
+```
+
+This cleanup runs whether `workLoop` completes normally, yields, or throws. Without it, global Scheduler state could leak from one task into unrelated work.
+
+## Summary
+
+`flushWork` does not decide which task runs. That is `workLoop`'s job. `flushWork` makes the environment around `workLoop` consistent: scheduling flags are reset, timer callbacks are cancelled when redundant, re-entrance is tracked, and global state is restored afterward.
