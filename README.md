@@ -1,23 +1,3 @@
-# vite-plus-starter
+# React Scheduler
 
-A starter for creating a Vite Plus project.
-
-## Development
-
-- Install dependencies:
-
-```bash
-vp install
-```
-
-- Run the unit tests:
-
-```bash
-vp test
-```
-
-- Build the library:
-
-```bash
-vp pack
-```
+This is the package of React Scheduler. for more info check [docs](https://lukonik.github.io/react-scheduler-explained)
