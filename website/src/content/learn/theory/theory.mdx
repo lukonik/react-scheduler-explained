@@ -1,0 +1,22 @@
+---
+title: Theory
+---
+
+# Theory
+
+This section introduces the main ideas behind React's internal Scheduler before we move into the source code.
+
+The goal here is to build a clear mental model. Scheduler has several moving parts: tasks, priorities, queues, delayed work, host callbacks, and yielding back to the browser. Each part is small on its own, but the full behavior only becomes clear when you see how those parts connect.
+
+These pages explain the concepts first, without going too deep into implementation details too early. After that, the source-code section walks through the actual functions step by step.
+
+## What This Section Covers
+
+The Theory section is organized around the main pieces of Scheduler:
+
+- **Queues** explains how Scheduler stores ready tasks and delayed tasks, and why it uses min-heaps instead of ordinary arrays.
+- **Task** explains the task object, including `callback`, `priorityLevel`, `startTime`, `expirationTime`, and `sortIndex`.
+- **Browser Work** explains why Scheduler must yield to the browser and what "giving control back" actually means on the main thread.
+- **Scheduler** brings the pieces together and describes the full flow from scheduling a callback to running and continuing work.
+
+By the end of this section, you should understand the design of Scheduler well enough to read the source code with context rather than treating each function as an isolated detail.
