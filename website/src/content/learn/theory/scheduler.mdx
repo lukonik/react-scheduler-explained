@@ -38,6 +38,7 @@ function requestHostCallback() {
   }
 }
 ```
+
 `isMessageLoopRunning` is a global variable that prevents to schedule it again if it is scheduled to run `schedulePerformWorkUntilDeadline`
 does the scheduling itself meaning calling the workLoop function in next event cycle using available methods like `setTimeout`.
 
@@ -45,3 +46,19 @@ the scheduling happens whenever the task is registered to the queue. then it is 
 why workLoop is not called explicitely but scheduled, that because if it was not scheduled and run right away, after adding task it would be processed right away
 and would loose whole point of the task processing in the first place, imagine adding task to queue queue has 1 item processed then it has 0 item, and so one.
 so instead of it it is done in the next event cycle, so any number of tasks can be added without processing it right away.
+
+So we moved to the logical part adding the task to the queue. this process happens in `scheduleCallback` function and it is exported publicly so
+React can schedule tasks with it. the function acceps following parameters:
+
+```ts
+function scheduleCallback(
+  priorityLevel: PriorityLevel,
+  callback: Callback,
+  options?: { delay: number },
+):
+```
+
+`priorityLevel` is as name suggests priority that, will be priorityLevel for task that will be used to sort it's place in task,
+the callback is the function to execute itself, and delay is the option that will 
+decide to put the task in tasksQueue or in timersQueue. So either tasks goes to the tasksQueue or in the timersQueue. Let's start with main
+tasksQueue.
