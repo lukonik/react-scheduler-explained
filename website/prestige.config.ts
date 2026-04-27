@@ -1,7 +1,7 @@
 import { defineConfig } from "@lonik/prestige/vite";
 
 export default defineConfig({
-  title: "website",
+  title: "React Scheduler",
   license: {
     label: "MIT",
     url: "https://opensource.org/licenses/MIT",
