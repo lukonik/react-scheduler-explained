@@ -4,106 +4,27 @@ title: scheduleCallback
 
 # scheduleCallback
 
-scheduleCallback implementation is this
+`scheduleCallback` is the public entry point for adding work to Scheduler.
 
 ```ts
 function scheduleCallback(
   priorityLevel: PriorityLevel,
   callback: Callback,
   options?: { delay: number },
-): Task {
-  var currentTime = getCurrentTime();
-
-  var startTime;
-  if (typeof options === "object" && options !== null) {
-    var delay = options.delay;
-    if (typeof delay === "number" && delay > 0) {
-      startTime = currentTime + delay;
-    } else {
-      startTime = currentTime;
-    }
-  } else {
-    startTime = currentTime;
-  }
-
-  var timeout;
-  switch (priorityLevel) {
-    case ImmediatePriority:
-      // Times out immediately
-      timeout = -1;
-      break;
-    case UserBlockingPriority:
-      // Eventually times out
-      timeout = userBlockingPriorityTimeout;
-      break;
-    case IdlePriority:
-      // Never times out
-      timeout = maxSigned31BitInt;
-      break;
-    case LowPriority:
-      // Eventually times out
-      timeout = lowPriorityTimeout;
-      break;
-    case NormalPriority:
-    default:
-      // Eventually times out
-      timeout = normalPriorityTimeout;
-      break;
-  }
-
-  var expirationTime = startTime + timeout;
-
-  var newTask: Task = {
-    id: taskIdCounter++,
-    callback,
-    priorityLevel,
-    startTime,
-    expirationTime,
-    sortIndex: -1,
-  };
-
-  // this is when delay is specified
-  if (startTime > currentTime) {
-    // This is a delayed task.
-    newTask.sortIndex = startTime;
-    push(timerQueue, newTask);
-    if (peek(taskQueue) === null && newTask === peek(timerQueue)) {
-      // All tasks are delayed, and this is the task with the earliest delay.
-      if (isHostTimeoutScheduled) {
-        // Cancel an existing timeout.
-        cancelHostTimeout();
-      } else {
-        isHostTimeoutScheduled = true;
-      }
-      // Schedule a timeout.
-      requestHostTimeout(handleTimeout, startTime - currentTime);
-    }
-  } else {
-    // if not sortIndex is expirationTime and pushed to the taskQueue
-    newTask.sortIndex = expirationTime;
-    push(taskQueue, newTask);
-    // Schedule a host callback, if needed. If we're already performing work,
-    // wait until the next time we yield.
-    if (!isHostCallbackScheduled && !isPerformingWork) {
-      isHostCallbackScheduled = true;
-      requestHostCallback();
-    }
-  }
-
-  return newTask;
-}
+): Task
 ```
 
-I know it looks intimidating at first, because how long it is but really there is simple logic happening which we will understand in this article.
+It receives:
 
-But before that let's see what it does. `scheduleCallback` is used to register task into the Scheduler, either it will be added
-or TasksQueue or in TimersQueue. it accepts priorityLevel that will be used to calculate the priority of the callback
-the callback function that is the function to execute and options with delay parameter this is an optional parameter, if delay is
-specified it means that this callback should execute in future and added to timersQueue otherwise it is added to tasksQueue.
+- `priorityLevel`: how urgent the work is.
+- `callback`: the function Scheduler will eventually run.
+- `options.delay`: an optional delay before the task becomes eligible to run.
 
-it returns the created taskObject.
+The function returns the created `Task`. React can later pass that task to `cancelCallback`.
 
-Now let's explore the source code. we will divide them part by part so it will be more easily digestible.
+## Step 1: Compute `startTime`
+
+The first step is to capture the current time and decide when the task is allowed to start:
 
 ```ts
 var currentTime = getCurrentTime();
@@ -121,41 +42,29 @@ if (typeof options === "object" && options !== null) {
 }
 ```
 
-main objective of this code is to define currentTime and set the startTime variable.
+If `delay` is a positive number, the task is delayed and `startTime` is in the future. Otherwise, the task is ready immediately and `startTime` is the current time.
 
-`currentTime` is the value from `getCurrentTime()` it is unique time value, it is either the date now or performance now.
+## Step 2: Compute `expirationTime`
 
-I want get into implementation of `getCurrentTime()` now not to add more complexities,we will do it later, but you can asume it is the current time.
-
-startTime evaluation is that if delay is undefined startTime = currentTime think of it that in this case startTime is not defined and
-it is indicator that task will be added to the tasksQueue. if delay is specified the startTime = currentTime + delay.
-that means this tasks has to be executed in future and will be indicator to added in timersQueue. the currentTime+delay is evaluation like
-if delay is 2000 (2s) it will run in future 2s
-
-Now lets continue the work
+Next, Scheduler converts the priority into a timeout:
 
 ```ts
 var timeout;
 switch (priorityLevel) {
   case ImmediatePriority:
-    // Times out immediately
     timeout = -1;
     break;
   case UserBlockingPriority:
-    // Eventually times out
     timeout = userBlockingPriorityTimeout;
     break;
   case IdlePriority:
-    // Never times out
     timeout = maxSigned31BitInt;
     break;
   case LowPriority:
-    // Eventually times out
     timeout = lowPriorityTimeout;
     break;
   case NormalPriority:
   default:
-    // Eventually times out
     timeout = normalPriorityTimeout;
     break;
 }
@@ -163,19 +72,13 @@ switch (priorityLevel) {
 var expirationTime = startTime + timeout;
 ```
 
-Next step is to evaluate `expirationTime` to compute expirationTime we will first calculate timeout.
-timeout is computed by Priority, it is predefined constant values that are chosen by React team.
-for example UserBlockingPriority is 250(ms). these predefined values have particular meaning. that means for a task
-that if task starts to execute but 250ms has already passed the task is overdue and it hints React that the callback
-has to do whatever it has to do and it can't postpone execution anymore. for additional example
-ImmediatePriority has value -1, that means that whenever such tasks executes it is always overdue. Keep in mind that this hints
-outside of Scheduler callback, because for a scheduler 250 and 50 is same it uses it only for sorting. you can see all the values of the priority timeout
-in `flags` file.
-startTime is either currentTime or delayed time as we know already how it is calculated. startTime is essential to use
-instead of just curentTime because if the task is delayed when it is time to execute, it will be always overdued because,
-currnetTime would be always passed ( assume timeout always elapsed as well).
+`expirationTime` is a deadline, not a timer. A user-blocking task with a 250ms timeout is not guaranteed to run exactly 250ms later. It can run earlier if Scheduler reaches it. The deadline tells Scheduler when the task has become overdue.
 
-so expirationTime is set accordingely let's move on
+For delayed tasks, the deadline is based on the future `startTime`. That prevents a delayed task from expiring before it is even eligible to run.
+
+## Step 3: Create the Task
+
+Scheduler then creates the task object:
 
 ```ts
 var newTask: Task = {
@@ -188,98 +91,59 @@ var newTask: Task = {
 };
 ```
 
-this is creation of task, there is nothing complicated for now sortIndex is null-like it will be evaluated later, either with
-startTime or expirationTime, also id is set by taskIdCounter variable which guarantees uniqueneess, this variable is defined
-in top `scheduler`
+`sortIndex` starts as `-1` because Scheduler has not decided which queue the task belongs to yet. It will become either `startTime` or `expirationTime`.
+
+## Step 4: Put Delayed Tasks in `timerQueue`
+
+If `startTime > currentTime`, the task is delayed:
 
 ```ts
-// Incrementing id counter. Used to maintain insertion order.
-var taskIdCounter = 1;
-```
-
-the last two branch (if/else) decides basically either to add it in TimersQueue or to add it in TasksQueue
-
-```ts
-// this is when delay is specified
 if (startTime > currentTime) {
-  // This is a delayed task.
   newTask.sortIndex = startTime;
   push(timerQueue, newTask);
+
   if (peek(taskQueue) === null && newTask === peek(timerQueue)) {
-    // All tasks are delayed, and this is the task with the earliest delay.
     if (isHostTimeoutScheduled) {
-      // Cancel an existing timeout.
       cancelHostTimeout();
     } else {
       isHostTimeoutScheduled = true;
     }
-    // Schedule a timeout.
+
     requestHostTimeout(handleTimeout, startTime - currentTime);
   }
 }
 ```
 
-this is the branch when it is decided to put it in timersQueue. `startTime > currentTime` will be true when delay is specified.
+Delayed tasks are ordered by `startTime`, so `sortIndex` is set to `startTime`.
 
-the sortIndex is set to startTime to properly sort it in timersQueue and the next line adds the task in timersQueue.
-
-Now as I said Scheduler doesn't run the loop all the time to check if there is any task in any queue to execute, it is shut of by default.
-so it needs to be manually called, let's say this method is called `workLoop` and it executes the tasks it needs to be called.
-now when the task is added in timersQueue, we need to tell scheduler that there is a task in timerQueue that will need to proceed.
-so the following code does that the first is the condition check
+The timeout scheduling condition is careful:
 
 ```ts
-if (peek(taskQueue) === null && newTask === peek(timerQueue))
+peek(taskQueue) === null && newTask === peek(timerQueue)
 ```
 
-the code inside the if schedules this workLoop call, so this condition does the following.
-first if taskQueue === null. if taskQueue is not null, then it means that the workLoop is scheduled already,
-there is no need to additionaly schedule it. but if it is null then it might be not scheduled
-if it passes then there is additional check
-`newTask === peek(timerQueue)` this is neccessary because if newTask has to execute soonest then by sorting of queue it will be the first one
-and if it is first one then the schedule of workLoop will be execute in future then the startTime of this task. so it means that
-it has to be cancelled and reschedule again with proper time. if newTask is not first item it means that the earlier task exist,
-and the workLoop is already scheduled.
-if both cases are true then it is time to schedule the workLoop. the following code is easy to digestible
+Scheduler schedules a host timeout only when there is no ready work and this new delayed task is the earliest timer. If another delayed task should start earlier, the existing timeout can stay. If this task is now the earliest one, Scheduler cancels the old timeout and schedules a new one for this task's start time.
 
-```ts
-// All tasks are delayed, and this is the task with the earliest delay.
-if (isHostTimeoutScheduled) {
-  // Cancel an existing timeout.
-  cancelHostTimeout();
-} else {
-  isHostTimeoutScheduled = true;
-}
-// Schedule a timeout.
-requestHostTimeout(handleTimeout, startTime - currentTime);
-```
+## Step 5: Put Ready Tasks in `taskQueue`
 
-if the workLoop is already scheduled it is cancelled via `cancelTimeout` and rescheduled again, and the timeout delay
-is when this task needs to be executed, so `startTime - currentTime` will be 2000ms for example if delay is 2000ms
-
-to sum up this logic:
-
-- adds task to the timersQueue
-- reschedules the workLoop if neccessary
-
-the else branch is for adding task in tasksQueue
+If the task is ready immediately, it goes into `taskQueue`:
 
 ```ts
 else {
-    // if not sortIndex is expirationTime and pushed to the taskQueue
-    newTask.sortIndex = expirationTime;
-    push(taskQueue, newTask);
-    // Schedule a host callback, if needed. If we're already performing work,
-    // wait until the next time we yield.
-    if (!isHostCallbackScheduled && !isPerformingWork) {
-      isHostCallbackScheduled = true;
-      requestHostCallback();
-    }
+  newTask.sortIndex = expirationTime;
+  push(taskQueue, newTask);
+
+  if (!isHostCallbackScheduled && !isPerformingWork) {
+    isHostCallbackScheduled = true;
+    requestHostCallback();
   }
+}
 ```
 
-sortIndex is set to expirationTime and the task is added to the tasksQueue. the last code is similar to timers queue
-it checks wheter the callback is not scheduled and there is no performing work which means that the workLoop will not executed and it is not scheduled to execute
-the work is scheduled
+Ready tasks are ordered by `expirationTime`, so `sortIndex` is set to `expirationTime`.
 
-Now we know how tasks are added let's see how they are processed, the main function that does this is `workLoop` that we will discuss next.
+After pushing the task, Scheduler requests a host callback unless one is already scheduled or Scheduler is currently inside the work loop. That is what starts the path toward `performWorkUntilDeadline`, `flushWork`, and finally `workLoop`.
+
+## Summary
+
+`scheduleCallback` does not execute the callback directly. It only creates a task, puts it in the correct queue, and schedules the minimum host work needed to process it later.

@@ -4,31 +4,129 @@ title: Browser Work
 
 # Browser Work
 
-Scheduler has two main job, first is to order tasks sequentally by priorities, the second is to give browser chance
-to do it's work while tasks are executing so to give it a breath and not lock the screen or something. Now how would you do
-something like that in a programming language that is synchrnous and you can't run two parallel threads that will execute
-your code and browser code.
+Scheduler has two responsibilities:
+
+1. Keep React work ordered by priority.
+2. Avoid blocking the browser for too long while that work is running.
+
+The second responsibility is what makes Scheduler more than a priority queue. If React performed every pending task in one long synchronous loop, the browser would not get enough time to respond to input, update layout, or paint the next frame.
+
+## What Counts as Browser Work?
+
+Browser work includes everything the browser needs to do outside your currently running JavaScript:
+
+- handle user input
+- run event callbacks
+- calculate styles
+- perform layout
+- paint pixels to the screen
+- run animation frame callbacks
+
+The important constraint is that JavaScript on the main thread runs to completion. While your JavaScript function is running, the browser cannot paint the next frame in the middle of that function.
+
+There is no API like this:
+
+```ts
+processBrowserWork();
+```
+
+You cannot manually tell the browser, "paint right now," while the call stack is still occupied by your JavaScript. The browser gets its opportunity after the current task finishes and the event loop reaches the rendering step.
+
+## Why Not Use a Worker?
 
 :::note
-    if webworker comes into your mind, it wont work because both of the code needs access to DOM which is not available
-    in webworker.
+A Web Worker does not solve this part of Scheduler. Workers can run JavaScript on another thread, but they cannot directly access the DOM. React's rendering pipeline ultimately needs to coordinate with main-thread UI updates, so Scheduler is designed around yielding on the main thread rather than moving this control loop into a worker.
 :::
 
-Well React team to decide the following approach: from time to time give browser to control something to execute
-and then continue the work, we will see how it is implemented exaclty in this chapter.
+Workers are useful for isolated CPU-heavy calculations, but Scheduler's job is different. It coordinates when React work should continue on the main thread, especially when that work competes with user input and painting.
 
-Now there is no method like `processBrowserWork` that can be called and it will execute whatever browser needs to do
-for example render the frame. Browser work is added to the Call Stack and executed whenever app code finishes execution.
-so if your code is running, browser will wait to finish execution and then do it's job. Imagine the tasksQueue has 100 task to execute
-and it iterates over the tasksQueue to execute all of them now it will hang the browser work until everything is executed,
-which will lock the browser work and make the website laggy, to avoid that React found the smart solution that relies on 
-how Javascript engine is working, as you already know from the event loop section, there are cycles in Javascript
-so there is current execution it is filled in callstack when it becomes empty the next cycle begins when there is new function
-what you can do is to schedule the function to run in the next cycle, for example `setTimeout(callback,0)` will move callback
-to the next cycle and it wont blog other functions in the current callstack. React uses this behavior. so what it does
-is that during task work loop it has a limit how long it can run currently it is 5 milliseconds, if it is running 
-more then 5 milliseconds it breaks from the while loop and schedules the workLoop to run in the next tick. doing that 
-gives browser to execute if it had something to execute because the callstack is not filled with App code anymore. so when the next cycle begins
-the workLoop resumes and the process is started over again the tasksk are exeecuted until 5 miliseconds limits then do it again.
-You will see exactly the code how it is done and how workLoop works. but the main topic of this area is for you to understand how it works.
- 
+## The Problem With One Long Task
+
+Imagine `taskQueue` contains 100 ready tasks. A simple implementation could do this:
+
+```ts
+while (taskQueue.length > 0) {
+  const task = taskQueue.shift();
+  task.callback();
+}
+```
+
+That approach is easy to understand, but it has a serious problem: if the loop takes 80ms, the browser is blocked for that entire 80ms. During that time, clicks may feel delayed, animations may stutter, and visual updates may not appear.
+
+The browser is not ignoring the work. It is waiting for JavaScript to give control back.
+
+## Scheduler's Approach
+
+Scheduler uses cooperative yielding. It runs work for a short amount of time, then stops before starting more non-expired work. If there is still work left, it schedules the work loop to continue in a later event cycle.
+
+The flow looks like this:
+
+1. Run Scheduler work.
+2. Check whether the current time slice has been used.
+3. If there is still time, continue with the next task.
+4. If the time budget is used, yield back to the browser.
+5. Schedule the remaining work for another event cycle.
+
+This does not make JavaScript parallel. It simply breaks one long block of work into smaller blocks, giving the browser opportunities between them.
+
+## The Time Budget
+
+In this implementation, Scheduler uses a small time budget:
+
+```ts
+export const frameYieldMs = 5;
+```
+
+The relevant time-budget logic lives inside `shouldYieldToHost`:
+
+```ts
+function shouldYieldToHost(): boolean {
+  const timeElapsed = getCurrentTime() - startTime;
+  if (timeElapsed < frameInterval) {
+    return false;
+  }
+
+  return true;
+}
+```
+
+If Scheduler has been running for less than `frameInterval`, it keeps working. Once it reaches the budget, it yields before starting more non-expired work.
+
+This check happens inside `workLoop`:
+
+```ts
+if (currentTask.expirationTime > currentTime && shouldYieldToHost()) {
+  break;
+}
+```
+
+Notice the first condition: `currentTask.expirationTime > currentTime`. Scheduler yields only when the current task has not expired. If the task is already overdue, Scheduler treats it as urgent and continues processing it.
+
+## Continuing Later
+
+Yielding only helps if Scheduler can continue the remaining work later. That continuation is scheduled through host APIs such as `MessageChannel`, `setImmediate`, or `setTimeout`.
+
+Conceptually, it works like this:
+
+```ts
+performSomeWork();
+
+if (hasMoreWork) {
+  scheduleWorkForNextEventCycle();
+}
+```
+
+When the browser gets control back, it can process input, paint, and run other pending work. Then, in a later event cycle, Scheduler resumes and processes more tasks.
+
+## Why This Matters for React
+
+React work can be large. Updating a complex UI may require walking many Fiber nodes, computing changes, and preparing DOM updates. If all of that happens in one uninterrupted task, the page can feel frozen.
+
+Scheduler gives React a way to make progress without monopolizing the main thread:
+
+- urgent work can run sooner
+- non-expired work can pause between chunks
+- the browser gets chances to paint and handle input
+- remaining work can resume later without losing its priority
+
+This is the core idea behind Scheduler's cooperation with the browser: React does not make the browser work while JavaScript is running. It periodically stops running JavaScript so the browser has a chance to do its own work.

@@ -4,9 +4,7 @@ title: Work Loop
 
 # Work Loop
 
-WorkLoop is the work horse function that does the main job although it is called from some wrapper function in the end
-the scheduler ends up calling workLoop if we understand this function then everything else is just nuts and bolts.
-this is the source code of workLoop
+`workLoop` is the core execution function. It pulls ready tasks from `taskQueue`, runs their callbacks, promotes delayed tasks when they become ready, and yields when Scheduler has used its current time slice.
 
 ```ts
 function workLoop(initialTime: number) {
@@ -15,24 +13,17 @@ function workLoop(initialTime: number) {
   currentTask = peek(taskQueue);
   while (currentTask !== null) {
     if (currentTask.expirationTime > currentTime && shouldYieldToHost()) {
-      // This currentTask hasn't expired, and we've reached the deadline.
       break;
     }
-    // $FlowFixMe[incompatible-use] found when upgrading Flow
+
     const callback = currentTask.callback;
     if (typeof callback === "function") {
-      // $FlowFixMe[incompatible-use] found when upgrading Flow
       currentTask.callback = null;
-      // $FlowFixMe[incompatible-use] found when upgrading Flow
       currentPriorityLevel = currentTask.priorityLevel;
-      // $FlowFixMe[incompatible-use] found when upgrading Flow
       const didUserCallbackTimeout = currentTask.expirationTime <= currentTime;
       const continuationCallback = callback(didUserCallbackTimeout);
       currentTime = getCurrentTime();
       if (typeof continuationCallback === "function") {
-        // If a continuation is returned, immediately yield to the main thread
-        // regardless of how much time is left in the current time slice.
-        // $FlowFixMe[incompatible-use] found when upgrading Flow
         currentTask.callback = continuationCallback;
 
         advanceTimers(currentTime);
@@ -48,7 +39,7 @@ function workLoop(initialTime: number) {
     }
     currentTask = peek(taskQueue);
   }
-  // Return whether there's additional work
+
   if (currentTask !== null) {
     return true;
   } else {
@@ -61,147 +52,102 @@ function workLoop(initialTime: number) {
 }
 ```
 
-the main job of workLoop is to grab the tasks from the Queue and execute them orderly, also during this process let browser to execute
-it's work if there will be any. let's move line by line to understand the process.
+## Start with Delayed Tasks
+
+The function begins by using the `initialTime` passed from `performWorkUntilDeadline`:
 
 ```ts
 let currentTime = initialTime;
-```
-
-currentTime is set by initialTime which is always the currentTime already, it is passed from outside just for the performance
-not to calculate it if it is already calculated which is the case when it is called with wrapper functions.
-
-```ts
 advanceTimers(currentTime);
 ```
 
-advanceTimers as we discussed already checks the timersQueue if there is any task that is time to execute from timersQueue and needs to be moved
-in tasksQueue, this function is called in multiple places as well, and it does same thing all the time to move tasks from timerQueue to tasksQueue.
+Calling `advanceTimers` before reading `taskQueue` is important. A delayed task may have become ready since the last Scheduler slice. If so, it needs to move from `timerQueue` into `taskQueue` before Scheduler chooses the next task.
+
+## Pick the Next Ready Task
+
+Scheduler then reads the highest-priority ready task:
 
 ```ts
 currentTask = peek(taskQueue);
 while (currentTask !== null) {
-  //...
+  // process currentTask
 }
 ```
 
-this is where loop begans, the task is picked from the queue if there is no task then nothing happens otherwise loop begins.
+Because `taskQueue` is a min-heap ordered by `expirationTime`, `peek(taskQueue)` returns the ready task with the earliest deadline.
+
+## Yield Before Starting More Non-Expired Work
+
+Before executing the task, Scheduler checks whether it should yield:
 
 ```ts
 if (currentTask.expirationTime > currentTime && shouldYieldToHost()) {
-  // This currentTask hasn't expired, and we've reached the deadline.
   break;
 }
 ```
 
-now this is where the browser handle happens. so there is two conditions. the first one is
+This condition has two parts.
+
+First, the task must be non-expired:
 
 ```ts
-currentTask.expirationTime > currentTime;
+currentTask.expirationTime > currentTime
 ```
 
-this check is that expirationTime is more then currentTime then it is okay to break the while loop and give handle to browser
-because if expirationTime is less then currentTime then it means that this task is overdue and it has to be executed as soon as possible
-so it is not possible to give browser handle, now if it is true then there is next check
+If the task is already expired, Scheduler treats it as urgent and does not yield before running it.
+
+Second, Scheduler asks whether the current time slice has been used:
 
 ```ts
-shouldYieldToHost;
+shouldYieldToHost()
 ```
 
-this function checks that if it is already time to give browser handle, it is a fixed timer that on every X secons it gives browser
-
-handle to execute, we will not discuss it here not to add complexity we will do it later, but just to give you the small code
-to give what is does it this
+In this project, the practical rule is the time budget:
 
 ```ts
-let frameInterval: number = 5;
-/...
 const timeElapsed = getCurrentTime() - startTime;
 if (timeElapsed < frameInterval) {
   return false;
 }
-// Yield now.
 return true;
 ```
 
-so it checks if 5 milliseconds has passed from starting the execution it is time to stop and give browser handle,
-startTime is not task startTime field it is global variable that is set before the startTime I won't go deep for that for now
-just to make it short if 5milliseconds has passed it is time to give handle to browser
+If the task is non-expired and the time budget is used, `workLoop` breaks. That gives the browser a chance to process input, paint, and run other work before Scheduler continues in another event cycle.
 
-so if both of this condition is true the while loop stops if not the logic is continued. now let's move a long
+## Run the Callback
+
+If the task has a function callback, Scheduler prepares and runs it:
 
 ```ts
 const callback = currentTask.callback;
 if (typeof callback === "function") {
-  // $FlowFixMe[incompatible-use] found when upgrading Flow
   currentTask.callback = null;
-  // $FlowFixMe[incompatible-use] found when upgrading Flow
   currentPriorityLevel = currentTask.priorityLevel;
-  // $FlowFixMe[incompatible-use] found when upgrading Flow
   const didUserCallbackTimeout = currentTask.expirationTime <= currentTime;
   const continuationCallback = callback(didUserCallbackTimeout);
   currentTime = getCurrentTime();
-  if (typeof continuationCallback === "function") {
-    // If a continuation is returned, immediately yield to the main thread
-    // regardless of how much time is left in the current time slice.
-    // $FlowFixMe[incompatible-use] found when upgrading Flow
-    currentTask.callback = continuationCallback;
-
-    advanceTimers(currentTime);
-    return true;
-  } else {
-    if (currentTask === peek(taskQueue)) {
-      pop(taskQueue);
-    }
-    advanceTimers(currentTime);
-  }
+  // ...
 }
 ```
 
-now this is quite a long if branch so we go line by line, the first one is the callback check
+Setting `currentTask.callback = null` prevents the same callback from being reused accidentally. If the callback returns a continuation, Scheduler will explicitly store that continuation back on the task.
 
-```ts
-if (typeof callback === "function")
-```
+`currentPriorityLevel` is updated so code running inside the callback can read the active priority through `getCurrentPriorityLevel`.
 
-this check ensures that callback is still executable, because it might be null instead of function, null value of callback is when
-this task is cancelled and needs to be removed from the queue. removing the task from queue doesn't happen explicitely because,
-the task might be not in the first place and removing it from somewhere else in the queue array would be inneficient, so callback
-is set to null which hints the scheduler this task needs to be removed, this check is exactly for that,
-entering in the branch sets the callback to null
-
-```ts
-currentTask.callback = null;
-```
-
-this ensures that this task will be excuted only once and no more, and it will be removed later in while loop.
-
-```ts
-currentPriorityLevel = currentTask.priorityLevel;
-```
-
-this priority is set that will be available with `getCurrentPriorityLevel` and can be used later in the callback, but it doesn't effect the workLoop f unctionality
-
-let's go with the next line
+`didUserCallbackTimeout` tells the callback whether the task has passed its deadline:
 
 ```ts
 const didUserCallbackTimeout = currentTask.expirationTime <= currentTime;
-const continuationCallback = callback(didUserCallbackTimeout);
 ```
 
-this is the heart of the whole scheduler where after so many lines and so many my talks we arritve at the destination this is where
-the callback function is called. the didUserCallbackTimeout is the boolean which checks if the task is overdued or not and it is passed
-to the callback.
-the callback is executed and the return value is set to continuationCallback. the continuationCallback can be either null or a function
-if it is null it means that callback completed the execution, but if function returned the function is returned that will be used
-to resume the work on the next tick. this might be the case when callback is a heavy computation function and it might decide to
-return the function to allow other things to process. so if function is returned it means that it needs to execute this is the code that schedules it
+Then Scheduler calls the callback and updates `currentTime`, because the callback may have taken time to run.
+
+## Handle Continuations
+
+A callback can return another function:
 
 ```ts
 if (typeof continuationCallback === "function") {
-  // If a continuation is returned, immediately yield to the main thread
-  // regardless of how much time is left in the current time slice.
-  // $FlowFixMe[incompatible-use] found when upgrading Flow
   currentTask.callback = continuationCallback;
 
   advanceTimers(currentTime);
@@ -209,40 +155,43 @@ if (typeof continuationCallback === "function") {
 }
 ```
 
-so there currentTask.callback is reasigned to the continuationCallback, this guarantees that the task stays with the same priority and order,
-and then advanceTimer is called to recheck the timersQueue the return true means for outside function that there is still work needs to be done
-so the outer function will schedule workLoop again
+That returned function is a continuation of the same task. Scheduler stores it back on `currentTask.callback` and returns `true`, which tells `performWorkUntilDeadline` to schedule another Scheduler slice.
 
-so if continuationCallback is not returned, the task is rmeoved from tasksQueue
+Notice that Scheduler returns immediately when a continuation is produced. Even if there is still time left in the current slice, yielding here gives the host environment a chance to run before continuing a long piece of work.
+
+## Remove Finished or Cancelled Tasks
+
+If the callback does not return a continuation, the task is complete:
+
+```ts
+if (currentTask === peek(taskQueue)) {
+  pop(taskQueue);
+}
+advanceTimers(currentTime);
+```
+
+The `currentTask === peek(taskQueue)` check matters because the callback may have scheduled a new task while it was running. If that new task became the first item in the heap, Scheduler must not accidentally remove it.
+
+If `callback` was not a function, the task was cancelled:
 
 ```ts
 else {
-        if (currentTask === peek(taskQueue)) {
-          pop(taskQueue);
-        }
-        advanceTimers(currentTime);
-      }
+  pop(taskQueue);
+}
 ```
 
-you might wonder why this `if (currentTask === peek(taskQueue))` check is needed how currentTask be something else then, it was picked before.
-I also wonder that at first but then I found out that the callback function can schedule a new task during execution, so it might end up
-as the first item in Queue and without this check the wrong task would be removed.
-and adnvaceTimer is called as well and we are done with the branch when the callback function is defined
-if not the task is simply removed from tasksQueue.
+Cancellation is lazy. `cancelCallback` clears the callback, and `workLoop` removes the task when it reaches the front of the queue.
+
+After each task, Scheduler checks timers again and then reads the next task:
 
 ```ts
-else {
-      pop(taskQueue);
-    }
-```
-
-and finally it is time to move to the next task and loop starts again
-
-```ts
+advanceTimers(currentTime);
 currentTask = peek(taskQueue);
 ```
 
-after loop breaks it is decided to return it is more work to do or not
+## Decide Whether More Work Remains
+
+When the loop exits, Scheduler returns a boolean:
 
 ```ts
 if (currentTask !== null) {
@@ -256,14 +205,20 @@ if (currentTask !== null) {
 }
 ```
 
-first line is that if currentTask still exists and not set to null, it still processed so true is returned
-otherwise the timerQueue is checked and if there is a timer task, the workLoop is scheduled in the delay time.
+If `currentTask !== null`, the loop stopped before all ready work finished. Usually that means Scheduler yielded because the time budget was used. Returning `true` tells `performWorkUntilDeadline` to schedule another host callback.
 
-when I mention to schedule workLoop if you check the code there is other methods that is scheduled but the final function is
-workLoop the most important, the other ones we will discuss it later.
+If there is no ready task left, Scheduler checks `timerQueue`. If a delayed task remains, it schedules a host timeout for the earliest `startTime`.
 
-and we are done the main function is explored. I sugges you look the whole function again just go line by line if you understand
-how it works and if not reread the section again.
+If both queues are empty, `workLoop` returns `false`, and the message loop stops.
 
-Next functions that we are going to dicsuss are still important but not the major ones they are either wrappers to the workLoop functions
-or utility functions, but still important, so we will continue with `requestHostCallback` function
+## Summary
+
+`workLoop` is where Scheduler's main behavior comes together:
+
+1. Promote ready delayed tasks.
+2. Read the next task from `taskQueue`.
+3. Yield before non-expired work if the time budget is used.
+4. Execute the task callback.
+5. Preserve continuations.
+6. Remove completed or cancelled tasks.
+7. Return whether Scheduler needs another host callback.

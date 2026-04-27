@@ -4,101 +4,277 @@ title: Task
 
 # Task
 
-Task is an entity that represetns the callback function, that will be executed bt scheduler i has following properties:
-id, sortIndex,callback,priorityLevle,expirationTime,startTime
+A task is Scheduler's internal representation of one unit of work. React gives Scheduler a callback and a priority; Scheduler wraps that information in a task object so it can order, delay, execute, continue, or cancel the work later.
 
-we will explore each and every field that will give us clear picture how scheduler works. Let's start with most important one with callback
+The task type in this project is:
 
-## callback
+```ts
+export type Task = {
+  id: number;
+  callback: Callback | null;
+  priorityLevel: PriorityLevel;
+  startTime: number;
+  expirationTime: number;
+  sortIndex: number;
+};
+```
 
-callback is a function that will be executed it is passsed to scheduler from outside of world mainly registered via `scheduleCallback` scheduler passes one boolean to the
-callback namely `didUserCallbackTimeout` This boolean tells callback that it was called overdue not in timeframe when it was okay to execute the callback React checks this 
-boolean and if it is true it knows that it has to hurry up and execute whatever it needs to do immediately. also callback can return the function if nothing is return the task is removed from the queue if
-function is returned that means that there still work needs to be done, so task callback is set to this function and kept in Queue on the next time when time comes this function si executed React uses it
-to pause heavy function and resume it later.
+Each field supports a specific part of Scheduler's behavior:
 
-For a quick example:
+- `id`: preserves insertion order when two tasks have the same sort value.
+- `callback`: the function Scheduler will execute.
+- `priorityLevel`: the priority React assigned to the work.
+- `startTime`: the earliest time the task is allowed to run.
+- `expirationTime`: the deadline after which the task is considered expired.
+- `sortIndex`: the value used by the heap to order the task.
 
-[HERE_IS_QUICK_EXAMPLE]
+## `callback`
 
-callback will appear later chapter as well, so if you don't see it how it works no worries you will get full picture for it.
-Let's discuss next field priorityLevel
+`callback` is the function Scheduler eventually executes. It is passed into Scheduler through `scheduleCallback`:
 
-## PriorityLevel
+```ts
+scheduleCallback(NormalPriority, didUserCallbackTimeout => {
+  // React work happens here.
+});
+```
 
-PriorityLevel is the one that defined when to execute the callback. Important notice that "when" doesn't mean time in future.
-Scheduler will execute the tasks as soon as it is possible the "when" means the order level so if we have Task A, Task B, Task C
-in which order they can execute. So in short priorityLevel means order. PriorityLevel has six callable priority values
+The callback receives one boolean argument:
 
-### NoPriority
-this is basically "null" value of priority, it is never case
+```ts
+type Callback = (arg: boolean) => Callback | null | undefined;
+```
 
-### ImmediatePriority
-this is the highest priority it must execute ASAP
+That argument is usually called `didUserCallbackTimeout`. Scheduler computes it by comparing the task's `expirationTime` with the current time:
 
-### UserBlockingPriority
-this is still high priority but it's have still small gap to execute
+```ts
+const didUserCallbackTimeout = currentTask.expirationTime <= currentTime;
+const continuationCallback = callback(didUserCallbackTimeout);
+```
 
-### NormalPriority
-this is normalpriority
+If `didUserCallbackTimeout` is `true`, the task has passed its deadline. React can use that signal to treat the work as more urgent.
 
-### LowPriority
-Lowp riority
+The callback can also return another function. That returned function is called a continuation:
 
-### IdlePriority
-this is the priority it's okay if it never runs
+```ts
+scheduleCallback(NormalPriority, didUserCallbackTimeout => {
+  doPartOfTheWork(didUserCallbackTimeout);
 
-Priority Levelis not used explicitely to sort taskss in Queue imagine 2 tasks registered with same priorityLevel which one should execute first?
-there is need for something more precise value. The priority value is used to compute expirationTime which will be used for sorting we are going to discuss it next.
+  if (hasMoreWork()) {
+    return didUserCallbackTimeout => {
+      doTheRemainingWork(didUserCallbackTimeout);
+    };
+  }
 
-## expirationTime
-expirationTime is a value that is computed by priorityLevel and time, it is almost unqiue value I say almost you'll see why and is used primarily as sorting value in TasksQueue
-expirationTime is computed by following: (current time) + (timeout by priority)
+  return null;
+});
+```
 
-this timeout based on priority are following values:
+If the callback returns a function, Scheduler stores that function back on the same task:
 
-* ImmediatePriroity => -1
-* UserBlockingPriority => 250
-* NormalPriority => 5 000
-* LowPriority => 10 000
-* IdlePriority => MAX_INT_VALUE ( rougly 107,374,182,3)
+```ts
+currentTask.callback = continuationCallback;
+```
 
-so the formula is
+The task stays in the queue and can continue later. If the callback returns `null` or `undefined`, Scheduler treats the task as complete and removes it from `taskQueue`.
 
-expirationTime = startTime + timeout
+## `priorityLevel`
 
-for example if callback si scheduled with immediate priority it will be
+`priorityLevel` describes how urgent the task is. This project defines the priority values like this:
 
-[EXAMPLE_CODE]
+```ts
+export const NoPriority = 0;
+export const ImmediatePriority = 1;
+export const UserBlockingPriority = 2;
+export const NormalPriority = 3;
+export const LowPriority = 4;
+export const IdlePriority = 5;
+```
 
-or callback with userBlockingPriority it will be
+The public Scheduler API in this project exports these usable priorities:
 
-[EXAMPLE_CODE]
+- `ImmediatePriority`: highest urgency; expires immediately.
+- `UserBlockingPriority`: urgent work related to user interaction.
+- `NormalPriority`: default priority for ordinary work.
+- `LowPriority`: work that can wait longer.
+- `IdlePriority`: work that should run only when nothing more important is pending.
 
-now you might wonder why not use simple counter value for sorting. That will be guaranteed uniquely and sorted ascedantley.
-The answer lies in the callback passing parameter that we talked about before to remind you it is a boolean called `didUserCallbackTimeout`
-this boolean is computed comparing expirationTime with currentTime. this is indicator that callback had to execute before but overdued This is important
-for React to decide how to process code inside the callback. Think of it that React will decide to run the callback code internally immediately or maybe wait a bit 
-and do something else meanwhile. so the simple counter wont give y that flexibility but the issue is that expiration might end up duplicated so in addition to that id field 
-is used for sorting before we move on, notice that immediatePriority gap value is -1 which means that expirationTime is always pastValiue so `diduserCallbackTimeout` will be true always
+`NoPriority` exists in the priority module as a sentinel value, but it is not exported from the Scheduler entry point in this implementation. It is not a normal priority you schedule work with here.
 
-## Id
+Priority is not used directly as the heap sort value. If Scheduler sorted only by priority, two tasks with the same priority would still need a fair order, and Scheduler would lose information about when a task becomes overdue. Instead, priority is converted into a timeout, and that timeout is used to compute `expirationTime`.
 
-id is the simple incremental id it is used for debuggin purpsose as well for sorting the tasks in Queue when expirationDate has same value
+## `expirationTime`
 
-## StartTime
+`expirationTime` is the task's deadline. Scheduler uses it for two things:
 
-As we know already there are two Queues for tasks is TasksQueue and second the TimersQueue.
-TasksQueue is primary queue that is processed by scheduler. TimersQueue is a wait queue as we know already that callback is registered with priority level. In addition to that
-there is a delay parameter that can be passed. This delay parameter is used to schedule callback in future, think of it as a setTimeout scheduling. when this is specified the task is 
-to the TimersQueue when time comes it is moved to TaskskQueue and processed accordingely.
+1. Ordering ready tasks in `taskQueue`.
+2. Computing `didUserCallbackTimeout` when the task runs.
 
-The start time is computed adding delay + currentTime. This ensures that it will execute correctly whe time comes and for TimersQueue startTime is used for sorting the Queue
-The expiration date is computed with following formulat:
-expirationTime = startTime + timeout
-the currentTime is replaced with startTime the raeson behind that is that when it will be moved to taskQueue and process by scheduler it would be always overdude if it was used  currentTime
-other thant that expirationTime is exactly the same
-we will talk about the Queues in depth in later section just keep in mind the startTIme is the indicator when it will run
+The formula is:
 
-## sortIndex
-sortIndex is the sorting field for Queue if it is Tasks Queue expirationTime is set to sortIndex if TimersQueue startTime is used
+```ts
+expirationTime = startTime + timeout;
+```
+
+The timeout depends on the priority:
+
+```ts
+case ImmediatePriority:
+  timeout = -1;
+  break;
+case UserBlockingPriority:
+  timeout = userBlockingPriorityTimeout;
+  break;
+case IdlePriority:
+  timeout = maxSigned31BitInt;
+  break;
+case LowPriority:
+  timeout = lowPriorityTimeout;
+  break;
+case NormalPriority:
+default:
+  timeout = normalPriorityTimeout;
+  break;
+```
+
+In this project, the main timeout constants are:
+
+```ts
+export const userBlockingPriorityTimeout = 250;
+export const normalPriorityTimeout = 5000;
+export const lowPriorityTimeout = 10000;
+```
+
+`IdlePriority` uses `maxSigned31BitInt`, which is `1073741823`, a very large timeout. `ImmediatePriority` uses `-1`, so an immediate task is already expired as soon as it is created.
+
+For example, if the current time is `1000` and a user-blocking task is scheduled without delay:
+
+```ts
+startTime = 1000;
+timeout = 250;
+expirationTime = 1250;
+```
+
+If that task runs at time `1200`, it has not expired:
+
+```ts
+didUserCallbackTimeout = 1250 <= 1200; // false
+```
+
+If it runs at time `1300`, it has expired:
+
+```ts
+didUserCallbackTimeout = 1250 <= 1300; // true
+```
+
+An immediate task behaves differently:
+
+```ts
+startTime = 1000;
+timeout = -1;
+expirationTime = 999;
+```
+
+Because the expiration time is already in the past, `didUserCallbackTimeout` will be `true` when the task executes.
+
+The key point is that `expirationTime` is not a promise that the task will run at that exact time. It is a deadline used for ordering and urgency. Scheduler still runs tasks only when the host environment gives it a chance to run JavaScript.
+
+## `id`
+
+`id` is an incrementing number:
+
+```ts
+var taskIdCounter = 1;
+```
+
+Every new task receives the next id:
+
+```ts
+id: taskIdCounter++;
+```
+
+The heap compares `sortIndex` first. If two tasks have the same `sortIndex`, it compares `id`:
+
+```ts
+const diff = a.sortIndex - b.sortIndex;
+return diff !== 0 ? diff : a.id - b.id;
+```
+
+This keeps ordering stable. If two tasks have the same deadline or start time, the older task is processed first.
+
+## `startTime`
+
+`startTime` is the earliest time a task is allowed to run.
+
+For a normal task without a positive delay, `startTime` is the current time:
+
+```ts
+startTime = currentTime;
+```
+
+For a delayed task, `startTime` is computed from the current time plus the delay:
+
+```ts
+startTime = currentTime + delay;
+```
+
+For example, if the current time is `1000` and the task is scheduled with a `2000` millisecond delay:
+
+```ts
+startTime = 3000;
+```
+
+That delayed task goes into `timerQueue`, not `taskQueue`, because it is not ready yet. When the current time reaches its `startTime`, Scheduler moves it into `taskQueue`.
+
+The expiration time is still based on `startTime`:
+
+```ts
+expirationTime = startTime + timeout;
+```
+
+That matters because a delayed task should not become expired before it is even eligible to run.
+
+## `sortIndex`
+
+`sortIndex` is the field the heap uses to order tasks.
+
+For ready tasks in `taskQueue`, `sortIndex` is the task's `expirationTime`:
+
+```ts
+newTask.sortIndex = expirationTime;
+push(taskQueue, newTask);
+```
+
+For delayed tasks in `timerQueue`, `sortIndex` is the task's `startTime`:
+
+```ts
+newTask.sortIndex = startTime;
+push(timerQueue, newTask);
+```
+
+When a delayed task becomes ready, Scheduler moves it from `timerQueue` to `taskQueue` and changes its `sortIndex`:
+
+```ts
+pop(timerQueue);
+timer.sortIndex = timer.expirationTime;
+push(taskQueue, timer);
+```
+
+So `sortIndex` does not have one fixed meaning. Its meaning depends on which queue the task is currently in:
+
+| Queue | `sortIndex` means |
+| --- | --- |
+| `timerQueue` | `startTime` |
+| `taskQueue` | `expirationTime` |
+
+## Summary
+
+A task is small, but each field has a precise role:
+
+1. `callback` is the work to run and may return a continuation.
+2. `priorityLevel` determines the timeout used to compute the deadline.
+3. `startTime` decides when the task becomes eligible to run.
+4. `expirationTime` decides when the task becomes overdue.
+5. `sortIndex` orders the task inside the active queue.
+6. `id` breaks ties and preserves insertion order.
+
+Understanding this object makes the rest of Scheduler easier to follow: queues store tasks, `workLoop` executes their callbacks, and Scheduler updates their fields as tasks move from delayed work to ready work.

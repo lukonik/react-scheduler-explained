@@ -2,56 +2,219 @@
 title: Queues
 ---
 
-# Queue
+# Queues
 
-The main job scheduler does is it registers a function with predefined priority and executes it at a proper time. For example you can schedule callbacks like this:
+Scheduler's main job is to accept callback functions, order them by priority, and run them when the browser can afford to spend time on JavaScript.
+
+For example:
 
 ```ts
 scheduleCallback(UserBlockingPriority, () => {
-  someCOmputation1();
+  someComputation1();
 });
+
 scheduleCallback(ImmediatePriority, () => {
-  someCOmputation2();
+  someComputation2();
 });
 
 scheduleCallback(NormalPriority, () => {
-  someCOmputation3();
+  someComputation3();
 });
-
-// Execute order
-// Immediate => UserBlocking => Normal
-
 ```
 
-after this schedule will execute these callbacks sequentally with priority ordered and without sacrificing Browser Rendering. This functionality is crucial for React itself.
-React is built on Fiber tree (previously called Virtual DOM), that is in sync with what is rendered in DOM. and on every update new tree is built (with some share optimization) and compare with old Tree to propogate changes.
-This tree can hold thousands of nodes and the process can become costly for CPU and will block other processes to execute. To optimize it React uses Scheduler, to divide this whole work per chunks and use Scheduler to
-execute them efficiently. This single chunk of work is called a task in Reacts world.
+The expected execution order is:
 
-A task is an entity that holds multiple fields together mainly a callback function that needs to be executed and priorityLevel that pushes this callback in the Queue front or back
+```txt
+Immediate -> UserBlocking -> Normal
+```
 
-The brief description of process looks like this:
+That ordering is the responsibility of Scheduler's queues. React can break rendering work into smaller tasks, give each task a priority, and let Scheduler decide which task should run next without blocking the browser for too long.
 
-* React registers callback with priority in scheduler
-* React wraps the callback in tasks and adds it in task Queue and resortes the Quee to adjust newly added queue
-* when Scheduler pops this task when the computing resource is available and it is correct priority and executes it and removes this task from queue
+## What a Task Represents
 
-There are more nuances in the logic but this is the main part other nuances will be discussed later. This chapter discusses this flow in detail
+In Scheduler, a task is the unit of work stored in a queue. It contains the callback to execute, the priority assigned to that callback, and timing fields that help Scheduler decide when the task should run.
 
-Task is the main entity that represents a function to execute, priorityLevel with additional fields. It is stored in Queue and executed by scheduler when the time is appropriate.
-There are two different task storages in scheduler the TasksQueue and TimersQueue. TaskQueue is the main Queue that are processed by scheduler all the time. The timersQueue is like 
-a wait queue the tasks are put there with specific delay and when time comes it will be moved to taskQueue to execute both of these queues are miniheaps that are adjusted to be usable with scheduler, both of the queues are identical they just differ
-in purpose.
+The task shape looks like this:
 
-Queue source code are inside [mini-heap.ts](source-code) all the methods expect an array that will represent quue as I said there are two queues TaskQueue and TimersQueue both of them are declared in scheduler.js
+```ts
+export type Task = {
+  id: number;
+  callback: Callback | null;
+  priorityLevel: PriorityLevel;
+  startTime: number;
+  expirationTime: number;
+  sortIndex: number;
+};
+```
 
-Let's examine Scheduler miniheap functions that will give us a picture how Queues are organized. Queue implements mini-heap data structure it expects array of Node. Node has two properties id,sortIndex. these two properties define
-Node A is greater then Node B in our case less value means higher priority so sortIndex 2 will execute before then sortIndex3.
-The current implementation of scheduler might cause to have duplicate sortIndex as wie will see later so to avoid collision the id is used which is unique value.
-The core behaviour is following. Node (Task) is pushed to array. Array is resorted first task in array is always the one with highest priority. so access has constant time.
-peek does exactly that
-pop returns the first item and resorts the queue
-siftdown and siftup are used to resort adding and removing items accordingly.
-comparefunction is to compare nodes for sorting.
-as you know Queues are mini-heap data structure that perfectly suits Scheudler purpose. THe node is extended to the task obbject with additional fields but 
-it doesn't effect the Quueue functionality Let's epxlore the task object
+The queue does not need to understand every field. It only needs two ordering fields:
+
+- `sortIndex`: the primary value used for ordering.
+- `id`: the tie-breaker when two tasks have the same `sortIndex`.
+
+This is why the heap implementation works with a smaller `Node` type:
+
+```ts
+type Node = {
+  id: number;
+  sortIndex: number;
+};
+```
+
+A `Task` has more fields than a `Node`, but it still satisfies the `Node` shape because it has both `id` and `sortIndex`.
+
+## The Two Scheduler Queues
+
+Scheduler keeps two queues:
+
+```ts
+var taskQueue: Array<Task> = [];
+var timerQueue: Array<Task> = [];
+```
+
+`taskQueue` stores tasks that are ready to run. In this queue, `sortIndex` is set to the task's `expirationTime`:
+
+```ts
+newTask.sortIndex = expirationTime;
+push(taskQueue, newTask);
+```
+
+The lower the `expirationTime`, the sooner the task should run. This lets expired or nearly expired work move toward the front of the queue.
+
+`timerQueue` stores delayed tasks that are not ready yet. In this queue, `sortIndex` is set to the task's `startTime`:
+
+```ts
+newTask.sortIndex = startTime;
+push(timerQueue, newTask);
+```
+
+The lower the `startTime`, the sooner the delayed task becomes eligible to move into `taskQueue`.
+
+So the same heap implementation supports both queues, but each queue uses a different meaning for `sortIndex`:
+
+| Queue | Contains | Ordered by |
+| --- | --- | --- |
+| `taskQueue` | Ready tasks | `expirationTime` |
+| `timerQueue` | Delayed tasks | `startTime` |
+
+## Why Scheduler Uses a Min-Heap
+
+Scheduler frequently needs to answer one question: "What is the next task I should consider?"
+
+A simple array could answer that by sorting the whole array after every insertion, but that would be wasteful. A min-heap is a better fit because it keeps the smallest item at the front while avoiding a full sort on every operation.
+
+In Scheduler, "smallest" means "most urgent according to `sortIndex`." For `taskQueue`, that is the earliest expiration. For `timerQueue`, that is the earliest start time.
+
+The important operations are:
+
+- `push`: insert a task and restore heap order.
+- `peek`: read the highest-priority task without removing it.
+- `pop`: remove the highest-priority task and restore heap order.
+
+## Comparing Tasks
+
+The comparison function defines the ordering:
+
+```ts
+function compare(a: Node, b: Node) {
+  const diff = a.sortIndex - b.sortIndex;
+  return diff !== 0 ? diff : a.id - b.id;
+}
+```
+
+If `a.sortIndex` is smaller than `b.sortIndex`, `a` should be closer to the front of the queue.
+
+If both tasks have the same `sortIndex`, Scheduler compares `id`. Since `id` is incremented every time a task is created, the older task wins the tie. This gives Scheduler stable ordering for tasks with the same deadline or start time.
+
+## Reading the Next Task with `peek`
+
+`peek` returns the first item in the heap:
+
+```ts
+export function peek<T extends Node>(heap: Heap<T>): T | null {
+  return heap.length === 0 ? null : heap[0];
+}
+```
+
+Because a min-heap keeps the smallest item at index `0`, `peek(taskQueue)` gives Scheduler the ready task with the earliest expiration:
+
+```ts
+currentTask = peek(taskQueue);
+```
+
+For `timerQueue`, `peek(timerQueue)` gives Scheduler the delayed task with the earliest start time:
+
+```ts
+const firstTimer = peek(timerQueue);
+```
+
+That is how Scheduler can quickly decide whether there is ready work to run or a delayed task that needs a timeout.
+
+## Adding a Task with `push`
+
+`push` inserts a node at the end of the heap array, then moves it upward until the heap order is restored:
+
+```ts
+export function push<T extends Node>(heap: Heap<T>, node: T): void {
+  const index = heap.length;
+  heap.push(node);
+  siftUp(heap, node, index);
+}
+```
+
+The helper `siftUp` compares the new node with its parent. If the new node is smaller, they swap places. This continues until the new node is either at the root or already larger than its parent.
+
+That is why adding a high-priority task can move it close to the front without sorting the whole array.
+
+## Removing a Task with `pop`
+
+`pop` removes the root of the heap, which is the item with the smallest `sortIndex`:
+
+```ts
+export function pop<T extends Node>(heap: Heap<T>): T | null {
+  if (heap.length === 0) {
+    return null;
+  }
+
+  const first = heap[0];
+  const last = heap.pop();
+
+  if (last !== first) {
+    heap[0] = last;
+    siftDown(heap, last, 0);
+  }
+
+  return first;
+}
+```
+
+After removing the first item, `pop` moves the last item to the root and calls `siftDown`. `siftDown` moves that item downward until the smallest remaining item is back at the root.
+
+Scheduler uses `pop(taskQueue)` when a task finishes or when it finds a cancelled task at the front of the queue.
+
+## Moving Delayed Tasks into `taskQueue`
+
+Delayed tasks do not execute directly from `timerQueue`. When their `startTime` arrives, Scheduler moves them into `taskQueue`:
+
+```ts
+pop(timerQueue);
+timer.sortIndex = timer.expirationTime;
+push(taskQueue, timer);
+```
+
+This step changes the meaning of `sortIndex`. While the task is delayed, `sortIndex` is `startTime`. Once the task is ready, `sortIndex` becomes `expirationTime`, so it can compete with other ready tasks by deadline.
+
+That transition is the reason Scheduler can use two queues with one heap implementation.
+
+## Summary
+
+Queues are the structure that make Scheduler efficient:
+
+1. `taskQueue` stores ready tasks ordered by expiration time.
+2. `timerQueue` stores delayed tasks ordered by start time.
+3. Both queues are min-heaps backed by arrays.
+4. `peek` gives Scheduler the next relevant task in constant time.
+5. `push` and `pop` maintain heap order without sorting the entire queue.
+6. `id` breaks ties when two tasks have the same `sortIndex`.
+
+Once this queue model is clear, the rest of Scheduler becomes easier to follow: `scheduleCallback` creates tasks, the queues keep them ordered, and `workLoop` repeatedly asks `taskQueue` what should run next.

@@ -1,13 +1,10 @@
 ---
-title: RequestHostCallback
+title: requestHostCallback
 ---
 
-# RequestHostCallback
+# requestHostCallback
 
-as we said scheduler doesn't do anything unless explicitely said to do so. one of the functions that does this is `requestHostCallback`
-requestHostCallback schedules workLoop to run
-
-this is the implementation of it
+`requestHostCallback` starts the host callback loop when Scheduler has ready work to process.
 
 ```ts
 function requestHostCallback() {
@@ -18,7 +15,18 @@ function requestHostCallback() {
 }
 ```
 
-it's pretty easy to understand so whats happening is that it is checked if it workLoop is already scheduled so not to overschedule it
-if it is not workLoop is scheduled.
+Scheduler does not run `workLoop` directly when a task is scheduled. It posts a host callback so work can run in a later event cycle.
 
-let's go along to continue with `schedulePerformWorkUntilDeadline`
+## `isMessageLoopRunning`
+
+`isMessageLoopRunning` prevents duplicate host callbacks.
+
+If it is `false`, there is no active Scheduler message loop. `requestHostCallback` sets it to `true` and schedules `performWorkUntilDeadline`.
+
+If it is already `true`, Scheduler has either posted a host callback or is already processing work. In that case, there is no need to post another one.
+
+## What Happens Next
+
+`schedulePerformWorkUntilDeadline` chooses the best available host API, such as `setImmediate`, `MessageChannel`, or `setTimeout`, and uses it to call `performWorkUntilDeadline`.
+
+So this function is small, but it is the switch that turns Scheduler from idle into active work processing.

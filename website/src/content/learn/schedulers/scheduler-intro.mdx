@@ -4,23 +4,47 @@ title: Scheduler Intro
 
 # Scheduler Intro
 
-We finally arrive at the critical functionality, congratulations. we have all the neccessary knowledge to explore
-how exactly scheduler works. to remind us the crucial points these are:
+At this point, the prerequisite pieces are in place:
 
-- Task is a function with priority that will be executed orderly without sacrificing browsers work
-- There are two Priority Queues that these tasks are stored
-  ** TasksQueue main queue for registering tasks that needs to be executed as soon as resource is available
-  ** TimersQueue that stores tasks that will be executed later in future, specified by delayed option
-- Scheduler uses event loop callstack functionality to give capability to the browser to execute its work in current even cycle
+- A task wraps a callback, priority, start time, expiration time, and heap ordering value.
+- `taskQueue` stores ready tasks ordered by expiration time.
+- `timerQueue` stores delayed tasks ordered by start time.
+- Scheduler uses the event loop to continue work in later event cycles instead of blocking the browser in one long task.
 
-We will now divide and conquer methods and logic for scheduler and then unite everything up to understand what's happening and how.
+Now we can read the Scheduler implementation as a connected flow.
 
-Whenever Scheduler Queues (TasksQueue and TimersQueue) are empty there is no code executed in scheduler, there is no while loop
-that checks all the time if there is any task in a queue to execute,
-it is shut off, as soon as task is registered the process starts. The main entry point for scheduler is the function
+## The Main Flow
 
-`scheduleCallback` this function is used to register the task, as soon as this task is registered the process begins.
-Let's see the source code of the `scheduleCallback`
+Scheduler is idle by default. There is no permanent loop running in the background that constantly checks the queues. Work begins only when something schedules a callback.
 
-let's find out how `scheduleCallback` works
+The main path is:
 
+1. `scheduleCallback` creates a task.
+2. The task goes into `taskQueue` or `timerQueue`.
+3. Ready work schedules a host callback through `requestHostCallback`.
+4. The host eventually calls `performWorkUntilDeadline`.
+5. `performWorkUntilDeadline` calls `flushWork`.
+6. `flushWork` calls `workLoop`.
+7. `workLoop` executes tasks until it finishes, runs out of time, or finds only delayed work left.
+
+Delayed tasks use an additional path:
+
+1. A delayed task enters `timerQueue`.
+2. Scheduler schedules a timeout for the earliest delayed task.
+3. When that timeout fires, `handleTimeout` calls `advanceTimers`.
+4. `advanceTimers` moves ready delayed tasks into `taskQueue`.
+5. Scheduler requests a host callback so `workLoop` can process them.
+
+## Why So Many Small Functions?
+
+The implementation is split into small functions because each part owns a narrow responsibility:
+
+- `scheduleCallback`: create a task and put it in the correct queue.
+- `advanceTimers`: move ready delayed tasks into `taskQueue`.
+- `requestHostCallback`: make sure a host callback is scheduled.
+- `schedulePerformWorkUntilDeadline`: choose the host API used to schedule work.
+- `performWorkUntilDeadline`: run one Scheduler slice and schedule another if needed.
+- `flushWork`: set up and clean up global Scheduler state around `workLoop`.
+- `workLoop`: execute ready tasks.
+
+The rest of this section walks through those functions in that order.

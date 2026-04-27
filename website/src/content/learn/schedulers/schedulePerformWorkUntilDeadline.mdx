@@ -1,29 +1,22 @@
-# SchedulePerformWorkUntilDeadline
+---
+title: schedulePerformWorkUntilDeadline
+---
 
-so how this workLoop is scheduled it is done with `schedulePerformWorkUntilDeadline` function. Now scheduling happens, on the next event cycle,
-scheduler tries to register it as a first callback in the next event cycle. depending on platform and availabe methods the best
-scheduling mechanism is chosed, let's see the code
+# schedulePerformWorkUntilDeadline
+
+`schedulePerformWorkUntilDeadline` is the function Scheduler uses to ask the host environment to call `performWorkUntilDeadline`.
+
+The goal is to continue Scheduler work in a later event cycle without relying on a slow or overly delayed mechanism when a better one is available.
+
+## The Implementation
 
 ```ts
 let schedulePerformWorkUntilDeadline;
 if (typeof localSetImmediate === "function") {
-  // Node.js and old IE.
-  // There's a few reasons for why we prefer setImmediate.
-  //
-  // Unlike MessageChannel, it doesn't prevent a Node.js process from exiting.
-  // (Even though this is a DOM fork of the Scheduler, you could get here
-  // with a mix of Node.js 15+, which has a MessageChannel, and jsdom.)
-  // https://github.com/facebook/react/issues/20756
-  //
-  // But also, it runs earlier which is the semantic we want.
-  // If other browsers ever implement it, it's better to use it.
-  // Although both of these would be inferior to native scheduling.
   schedulePerformWorkUntilDeadline = () => {
     localSetImmediate(performWorkUntilDeadline);
   };
 } else if (typeof MessageChannel !== "undefined") {
-  // DOM and Worker environments.
-  // We prefer MessageChannel because of the 4ms setTimeout clamping.
   const channel = new MessageChannel();
   const port = channel.port2;
   channel.port1.onmessage = performWorkUntilDeadline;
@@ -31,24 +24,72 @@ if (typeof localSetImmediate === "function") {
     port.postMessage(null);
   };
 } else {
-  // We should only fallback here in non-browser environments.
   schedulePerformWorkUntilDeadline = () => {
-    // $FlowFixMe[not-a-function] nullable value
     localSetTimeout(performWorkUntilDeadline, 0);
   };
 }
 ```
 
-now as you see first is the setImmediate function that what is doing is the on the next event cycle this function will be the first in the stack.
-it is only available on NodeJS and IE explorer so if not then MessageChannel is used MessageChannel postMessage will execute onMessage on next event cycle
-so it is used as alternative and finaly if nothing is supported then setTimeout is used, which is available everywhere.
-you might wonder what is this localSetImmediate and localSetTimeout they are declared in the top and set to setTimeout and setImmediate or default to polyfill if those doesn't exist.
-in our source code this checks are removed because setTImeout is available from the ICE age of browsers, the declaration is in scheduler top part
+Scheduler chooses the available API in this order:
+
+1. `setImmediate`
+2. `MessageChannel`
+3. `setTimeout`
+
+## Why `setImmediate` First?
+
+When `setImmediate` exists, Scheduler uses it:
+
 ```ts
-// Capture local references to native APIs, in case a polyfill overrides them.
-const localSetTimeout = setTimeout;
-const localClearTimeout = clearTimeout;
+schedulePerformWorkUntilDeadline = () => {
+  localSetImmediate(performWorkUntilDeadline);
+};
 ```
 
-so to sum up calling `schedulePerformWorkUntilDeadline` will schedule the workLoop on the next event cycle. let's explore next function
-that is executed in `schedulePerformWorkUntilDeadline` called `performWorkUntilDeadline`
+This mainly matters in Node.js and older IE environments. In Node.js, `setImmediate` also avoids a practical issue with `MessageChannel`: a `MessageChannel` can keep the process alive when Scheduler work is not meant to do that.
+
+## Why `MessageChannel` in Browsers?
+
+In browser and worker environments, Scheduler prefers `MessageChannel`:
+
+```ts
+const channel = new MessageChannel();
+const port = channel.port2;
+channel.port1.onmessage = performWorkUntilDeadline;
+schedulePerformWorkUntilDeadline = () => {
+  port.postMessage(null);
+};
+```
+
+Calling `port.postMessage(null)` schedules a message event. When that message is delivered, `channel.port1.onmessage` runs `performWorkUntilDeadline`.
+
+Scheduler prefers this over repeated `setTimeout(..., 0)` calls because browsers can clamp nested timers, commonly making them wait at least a few milliseconds. That delay is too expensive when Scheduler is repeatedly breaking work into small chunks.
+
+## Why Keep `setTimeout`?
+
+`setTimeout` is the fallback:
+
+```ts
+schedulePerformWorkUntilDeadline = () => {
+  localSetTimeout(performWorkUntilDeadline, 0);
+};
+```
+
+It is not the preferred mechanism, but it is widely available. If neither `setImmediate` nor `MessageChannel` exists, Scheduler can still function.
+
+## Local References
+
+The code stores local references to native APIs:
+
+```ts
+const localSetTimeout = setTimeout;
+const localClearTimeout = clearTimeout;
+const localSetImmediate =
+  typeof setImmediate !== "undefined" ? setImmediate : null;
+```
+
+This protects Scheduler from later changes to global APIs, such as test environments or polyfills replacing `setTimeout`.
+
+## Summary
+
+`schedulePerformWorkUntilDeadline` does not perform Scheduler work itself. It schedules `performWorkUntilDeadline` using the best available host API. That scheduled callback is what starts one slice of Scheduler execution.
