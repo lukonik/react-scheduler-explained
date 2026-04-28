@@ -31,8 +31,8 @@ export default defineConfig({
               slug: "learn/prerequisites/event-loop",
             },
             {
-              label: "Mini Heap",
-              slug: "learn/prerequisites/mini-heap",
+              label: "Min Heap",
+              slug: "learn/prerequisites/min-heap",
             },
           ],
         },
