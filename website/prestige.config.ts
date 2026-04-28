@@ -12,6 +12,10 @@ export default defineConfig({
       id: "learn",
       items: [
         {
+          label: "Overview",
+          slug: "learn/overview",
+        },
+        {
           label: "Introduction",
           slug: "learn/introduction",
         },
@@ -27,8 +31,8 @@ export default defineConfig({
               slug: "learn/prerequisites/event-loop",
             },
             {
-              label: "Mini Heap",
-              slug: "learn/prerequisites/mini-heap",
+              label: "Min Heap",
+              slug: "learn/prerequisites/min-heap",
             },
           ],
         },
@@ -60,10 +64,6 @@ export default defineConfig({
         {
           label: "Source Code",
           items: [
-            {
-              label: "Scheduler Intro",
-              slug: "learn/source-code/scheduler-intro",
-            },
             {
               label: "scheduleCallback",
               slug: "learn/source-code/scheduleCallback",

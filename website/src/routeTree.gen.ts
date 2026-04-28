@@ -11,7 +11,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ShowcaseRouteImport } from './routes/showcase'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as prestigeLearnOverviewRouteImport } from './routes/(prestige)/learn.overview'
 import { Route as prestigeLearnIntroductionRouteImport } from './routes/(prestige)/learn.introduction'
 import { Route as prestigeApiIntroductionRouteImport } from './routes/(prestige)/api.introduction'
 import { Route as prestigeApiApiRouteImport } from './routes/(prestige)/api.api'
@@ -21,19 +23,23 @@ import { Route as prestigeLearnTheorySchedulerRouteImport } from './routes/(pres
 import { Route as prestigeLearnTheoryQueuesRouteImport } from './routes/(prestige)/learn.theory.queues'
 import { Route as prestigeLearnTheoryBrowserWorkRouteImport } from './routes/(prestige)/learn.theory.browser-work'
 import { Route as prestigeLearnSourceCodeWorkLoopRouteImport } from './routes/(prestige)/learn.source-code.workLoop'
-import { Route as prestigeLearnSourceCodeSchedulerIntroRouteImport } from './routes/(prestige)/learn.source-code.scheduler-intro'
 import { Route as prestigeLearnSourceCodeSchedulePerformWorkUntilDeadlineRouteImport } from './routes/(prestige)/learn.source-code.schedulePerformWorkUntilDeadline'
 import { Route as prestigeLearnSourceCodeScheduleCallbackRouteImport } from './routes/(prestige)/learn.source-code.scheduleCallback'
 import { Route as prestigeLearnSourceCodeRequestHostCallbackRouteImport } from './routes/(prestige)/learn.source-code.requestHostCallback'
 import { Route as prestigeLearnSourceCodePerformWorkUntilDeadlineRouteImport } from './routes/(prestige)/learn.source-code.performWorkUntilDeadline'
 import { Route as prestigeLearnSourceCodeFlushWorkRouteImport } from './routes/(prestige)/learn.source-code.flushWork'
 import { Route as prestigeLearnPrerequisitesPrerequisitesRouteImport } from './routes/(prestige)/learn.prerequisites.prerequisites'
-import { Route as prestigeLearnPrerequisitesMiniHeapRouteImport } from './routes/(prestige)/learn.prerequisites.mini-heap'
+import { Route as prestigeLearnPrerequisitesMinHeapRouteImport } from './routes/(prestige)/learn.prerequisites.min-heap'
 import { Route as prestigeLearnPrerequisitesEventLoopRouteImport } from './routes/(prestige)/learn.prerequisites.event-loop'
 
 const prestigeLearnLazyRouteImport = createFileRoute('/(prestige)/learn')()
 const prestigeApiLazyRouteImport = createFileRoute('/(prestige)/api')()
 
+const ShowcaseRoute = ShowcaseRouteImport.update({
+  id: '/showcase',
+  path: '/showcase',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -53,6 +59,15 @@ const prestigeApiLazyRoute = prestigeApiLazyRouteImport
     getParentRoute: () => rootRouteImport,
   } as any)
   .lazy(() => import('./routes/(prestige)/api.lazy').then((d) => d.Route))
+const prestigeLearnOverviewRoute = prestigeLearnOverviewRouteImport
+  .update({
+    id: '/overview',
+    path: '/overview',
+    getParentRoute: () => prestigeLearnLazyRoute,
+  } as any)
+  .lazy(() =>
+    import('./routes/(prestige)/learn.overview.lazy').then((d) => d.Route),
+  )
 const prestigeLearnIntroductionRoute = prestigeLearnIntroductionRouteImport
   .update({
     id: '/introduction',
@@ -141,18 +156,6 @@ const prestigeLearnSourceCodeWorkLoopRoute =
         (d) => d.Route,
       ),
     )
-const prestigeLearnSourceCodeSchedulerIntroRoute =
-  prestigeLearnSourceCodeSchedulerIntroRouteImport
-    .update({
-      id: '/source-code/scheduler-intro',
-      path: '/source-code/scheduler-intro',
-      getParentRoute: () => prestigeLearnLazyRoute,
-    } as any)
-    .lazy(() =>
-      import('./routes/(prestige)/learn.source-code.scheduler-intro.lazy').then(
-        (d) => d.Route,
-      ),
-    )
 const prestigeLearnSourceCodeSchedulePerformWorkUntilDeadlineRoute =
   prestigeLearnSourceCodeSchedulePerformWorkUntilDeadlineRouteImport
     .update({
@@ -225,15 +228,15 @@ const prestigeLearnPrerequisitesPrerequisitesRoute =
         (d) => d.Route,
       ),
     )
-const prestigeLearnPrerequisitesMiniHeapRoute =
-  prestigeLearnPrerequisitesMiniHeapRouteImport
+const prestigeLearnPrerequisitesMinHeapRoute =
+  prestigeLearnPrerequisitesMinHeapRouteImport
     .update({
-      id: '/prerequisites/mini-heap',
-      path: '/prerequisites/mini-heap',
+      id: '/prerequisites/min-heap',
+      path: '/prerequisites/min-heap',
       getParentRoute: () => prestigeLearnLazyRoute,
     } as any)
     .lazy(() =>
-      import('./routes/(prestige)/learn.prerequisites.mini-heap.lazy').then(
+      import('./routes/(prestige)/learn.prerequisites.min-heap.lazy').then(
         (d) => d.Route,
       ),
     )
@@ -252,20 +255,21 @@ const prestigeLearnPrerequisitesEventLoopRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/showcase': typeof ShowcaseRoute
   '/api': typeof prestigeApiLazyRouteWithChildren
   '/learn': typeof prestigeLearnLazyRouteWithChildren
   '/api/api': typeof prestigeApiApiRoute
   '/api/introduction': typeof prestigeApiIntroductionRoute
   '/learn/introduction': typeof prestigeLearnIntroductionRoute
+  '/learn/overview': typeof prestigeLearnOverviewRoute
   '/learn/prerequisites/event-loop': typeof prestigeLearnPrerequisitesEventLoopRoute
-  '/learn/prerequisites/mini-heap': typeof prestigeLearnPrerequisitesMiniHeapRoute
+  '/learn/prerequisites/min-heap': typeof prestigeLearnPrerequisitesMinHeapRoute
   '/learn/prerequisites/prerequisites': typeof prestigeLearnPrerequisitesPrerequisitesRoute
   '/learn/source-code/flushWork': typeof prestigeLearnSourceCodeFlushWorkRoute
   '/learn/source-code/performWorkUntilDeadline': typeof prestigeLearnSourceCodePerformWorkUntilDeadlineRoute
   '/learn/source-code/requestHostCallback': typeof prestigeLearnSourceCodeRequestHostCallbackRoute
   '/learn/source-code/scheduleCallback': typeof prestigeLearnSourceCodeScheduleCallbackRoute
   '/learn/source-code/schedulePerformWorkUntilDeadline': typeof prestigeLearnSourceCodeSchedulePerformWorkUntilDeadlineRoute
-  '/learn/source-code/scheduler-intro': typeof prestigeLearnSourceCodeSchedulerIntroRoute
   '/learn/source-code/workLoop': typeof prestigeLearnSourceCodeWorkLoopRoute
   '/learn/theory/browser-work': typeof prestigeLearnTheoryBrowserWorkRoute
   '/learn/theory/queues': typeof prestigeLearnTheoryQueuesRoute
@@ -275,20 +279,21 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/showcase': typeof ShowcaseRoute
   '/api': typeof prestigeApiLazyRouteWithChildren
   '/learn': typeof prestigeLearnLazyRouteWithChildren
   '/api/api': typeof prestigeApiApiRoute
   '/api/introduction': typeof prestigeApiIntroductionRoute
   '/learn/introduction': typeof prestigeLearnIntroductionRoute
+  '/learn/overview': typeof prestigeLearnOverviewRoute
   '/learn/prerequisites/event-loop': typeof prestigeLearnPrerequisitesEventLoopRoute
-  '/learn/prerequisites/mini-heap': typeof prestigeLearnPrerequisitesMiniHeapRoute
+  '/learn/prerequisites/min-heap': typeof prestigeLearnPrerequisitesMinHeapRoute
   '/learn/prerequisites/prerequisites': typeof prestigeLearnPrerequisitesPrerequisitesRoute
   '/learn/source-code/flushWork': typeof prestigeLearnSourceCodeFlushWorkRoute
   '/learn/source-code/performWorkUntilDeadline': typeof prestigeLearnSourceCodePerformWorkUntilDeadlineRoute
   '/learn/source-code/requestHostCallback': typeof prestigeLearnSourceCodeRequestHostCallbackRoute
   '/learn/source-code/scheduleCallback': typeof prestigeLearnSourceCodeScheduleCallbackRoute
   '/learn/source-code/schedulePerformWorkUntilDeadline': typeof prestigeLearnSourceCodeSchedulePerformWorkUntilDeadlineRoute
-  '/learn/source-code/scheduler-intro': typeof prestigeLearnSourceCodeSchedulerIntroRoute
   '/learn/source-code/workLoop': typeof prestigeLearnSourceCodeWorkLoopRoute
   '/learn/theory/browser-work': typeof prestigeLearnTheoryBrowserWorkRoute
   '/learn/theory/queues': typeof prestigeLearnTheoryQueuesRoute
@@ -299,20 +304,21 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/showcase': typeof ShowcaseRoute
   '/(prestige)/api': typeof prestigeApiLazyRouteWithChildren
   '/(prestige)/learn': typeof prestigeLearnLazyRouteWithChildren
   '/(prestige)/api/api': typeof prestigeApiApiRoute
   '/(prestige)/api/introduction': typeof prestigeApiIntroductionRoute
   '/(prestige)/learn/introduction': typeof prestigeLearnIntroductionRoute
+  '/(prestige)/learn/overview': typeof prestigeLearnOverviewRoute
   '/(prestige)/learn/prerequisites/event-loop': typeof prestigeLearnPrerequisitesEventLoopRoute
-  '/(prestige)/learn/prerequisites/mini-heap': typeof prestigeLearnPrerequisitesMiniHeapRoute
+  '/(prestige)/learn/prerequisites/min-heap': typeof prestigeLearnPrerequisitesMinHeapRoute
   '/(prestige)/learn/prerequisites/prerequisites': typeof prestigeLearnPrerequisitesPrerequisitesRoute
   '/(prestige)/learn/source-code/flushWork': typeof prestigeLearnSourceCodeFlushWorkRoute
   '/(prestige)/learn/source-code/performWorkUntilDeadline': typeof prestigeLearnSourceCodePerformWorkUntilDeadlineRoute
   '/(prestige)/learn/source-code/requestHostCallback': typeof prestigeLearnSourceCodeRequestHostCallbackRoute
   '/(prestige)/learn/source-code/scheduleCallback': typeof prestigeLearnSourceCodeScheduleCallbackRoute
   '/(prestige)/learn/source-code/schedulePerformWorkUntilDeadline': typeof prestigeLearnSourceCodeSchedulePerformWorkUntilDeadlineRoute
-  '/(prestige)/learn/source-code/scheduler-intro': typeof prestigeLearnSourceCodeSchedulerIntroRoute
   '/(prestige)/learn/source-code/workLoop': typeof prestigeLearnSourceCodeWorkLoopRoute
   '/(prestige)/learn/theory/browser-work': typeof prestigeLearnTheoryBrowserWorkRoute
   '/(prestige)/learn/theory/queues': typeof prestigeLearnTheoryQueuesRoute
@@ -324,20 +330,21 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/showcase'
     | '/api'
     | '/learn'
     | '/api/api'
     | '/api/introduction'
     | '/learn/introduction'
+    | '/learn/overview'
     | '/learn/prerequisites/event-loop'
-    | '/learn/prerequisites/mini-heap'
+    | '/learn/prerequisites/min-heap'
     | '/learn/prerequisites/prerequisites'
     | '/learn/source-code/flushWork'
     | '/learn/source-code/performWorkUntilDeadline'
     | '/learn/source-code/requestHostCallback'
     | '/learn/source-code/scheduleCallback'
     | '/learn/source-code/schedulePerformWorkUntilDeadline'
-    | '/learn/source-code/scheduler-intro'
     | '/learn/source-code/workLoop'
     | '/learn/theory/browser-work'
     | '/learn/theory/queues'
@@ -347,20 +354,21 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/showcase'
     | '/api'
     | '/learn'
     | '/api/api'
     | '/api/introduction'
     | '/learn/introduction'
+    | '/learn/overview'
     | '/learn/prerequisites/event-loop'
-    | '/learn/prerequisites/mini-heap'
+    | '/learn/prerequisites/min-heap'
     | '/learn/prerequisites/prerequisites'
     | '/learn/source-code/flushWork'
     | '/learn/source-code/performWorkUntilDeadline'
     | '/learn/source-code/requestHostCallback'
     | '/learn/source-code/scheduleCallback'
     | '/learn/source-code/schedulePerformWorkUntilDeadline'
-    | '/learn/source-code/scheduler-intro'
     | '/learn/source-code/workLoop'
     | '/learn/theory/browser-work'
     | '/learn/theory/queues'
@@ -370,20 +378,21 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/showcase'
     | '/(prestige)/api'
     | '/(prestige)/learn'
     | '/(prestige)/api/api'
     | '/(prestige)/api/introduction'
     | '/(prestige)/learn/introduction'
+    | '/(prestige)/learn/overview'
     | '/(prestige)/learn/prerequisites/event-loop'
-    | '/(prestige)/learn/prerequisites/mini-heap'
+    | '/(prestige)/learn/prerequisites/min-heap'
     | '/(prestige)/learn/prerequisites/prerequisites'
     | '/(prestige)/learn/source-code/flushWork'
     | '/(prestige)/learn/source-code/performWorkUntilDeadline'
     | '/(prestige)/learn/source-code/requestHostCallback'
     | '/(prestige)/learn/source-code/scheduleCallback'
     | '/(prestige)/learn/source-code/schedulePerformWorkUntilDeadline'
-    | '/(prestige)/learn/source-code/scheduler-intro'
     | '/(prestige)/learn/source-code/workLoop'
     | '/(prestige)/learn/theory/browser-work'
     | '/(prestige)/learn/theory/queues'
@@ -394,12 +403,20 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ShowcaseRoute: typeof ShowcaseRoute
   prestigeApiLazyRoute: typeof prestigeApiLazyRouteWithChildren
   prestigeLearnLazyRoute: typeof prestigeLearnLazyRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/showcase': {
+      id: '/showcase'
+      path: '/showcase'
+      fullPath: '/showcase'
+      preLoaderRoute: typeof ShowcaseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -420,6 +437,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api'
       preLoaderRoute: typeof prestigeApiLazyRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/(prestige)/learn/overview': {
+      id: '/(prestige)/learn/overview'
+      path: '/overview'
+      fullPath: '/learn/overview'
+      preLoaderRoute: typeof prestigeLearnOverviewRouteImport
+      parentRoute: typeof prestigeLearnLazyRoute
     }
     '/(prestige)/learn/introduction': {
       id: '/(prestige)/learn/introduction'
@@ -484,13 +508,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof prestigeLearnSourceCodeWorkLoopRouteImport
       parentRoute: typeof prestigeLearnLazyRoute
     }
-    '/(prestige)/learn/source-code/scheduler-intro': {
-      id: '/(prestige)/learn/source-code/scheduler-intro'
-      path: '/source-code/scheduler-intro'
-      fullPath: '/learn/source-code/scheduler-intro'
-      preLoaderRoute: typeof prestigeLearnSourceCodeSchedulerIntroRouteImport
-      parentRoute: typeof prestigeLearnLazyRoute
-    }
     '/(prestige)/learn/source-code/schedulePerformWorkUntilDeadline': {
       id: '/(prestige)/learn/source-code/schedulePerformWorkUntilDeadline'
       path: '/source-code/schedulePerformWorkUntilDeadline'
@@ -533,11 +550,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof prestigeLearnPrerequisitesPrerequisitesRouteImport
       parentRoute: typeof prestigeLearnLazyRoute
     }
-    '/(prestige)/learn/prerequisites/mini-heap': {
-      id: '/(prestige)/learn/prerequisites/mini-heap'
-      path: '/prerequisites/mini-heap'
-      fullPath: '/learn/prerequisites/mini-heap'
-      preLoaderRoute: typeof prestigeLearnPrerequisitesMiniHeapRouteImport
+    '/(prestige)/learn/prerequisites/min-heap': {
+      id: '/(prestige)/learn/prerequisites/min-heap'
+      path: '/prerequisites/min-heap'
+      fullPath: '/learn/prerequisites/min-heap'
+      preLoaderRoute: typeof prestigeLearnPrerequisitesMinHeapRouteImport
       parentRoute: typeof prestigeLearnLazyRoute
     }
     '/(prestige)/learn/prerequisites/event-loop': {
@@ -566,15 +583,15 @@ const prestigeApiLazyRouteWithChildren = prestigeApiLazyRoute._addFileChildren(
 
 interface prestigeLearnLazyRouteChildren {
   prestigeLearnIntroductionRoute: typeof prestigeLearnIntroductionRoute
+  prestigeLearnOverviewRoute: typeof prestigeLearnOverviewRoute
   prestigeLearnPrerequisitesEventLoopRoute: typeof prestigeLearnPrerequisitesEventLoopRoute
-  prestigeLearnPrerequisitesMiniHeapRoute: typeof prestigeLearnPrerequisitesMiniHeapRoute
+  prestigeLearnPrerequisitesMinHeapRoute: typeof prestigeLearnPrerequisitesMinHeapRoute
   prestigeLearnPrerequisitesPrerequisitesRoute: typeof prestigeLearnPrerequisitesPrerequisitesRoute
   prestigeLearnSourceCodeFlushWorkRoute: typeof prestigeLearnSourceCodeFlushWorkRoute
   prestigeLearnSourceCodePerformWorkUntilDeadlineRoute: typeof prestigeLearnSourceCodePerformWorkUntilDeadlineRoute
   prestigeLearnSourceCodeRequestHostCallbackRoute: typeof prestigeLearnSourceCodeRequestHostCallbackRoute
   prestigeLearnSourceCodeScheduleCallbackRoute: typeof prestigeLearnSourceCodeScheduleCallbackRoute
   prestigeLearnSourceCodeSchedulePerformWorkUntilDeadlineRoute: typeof prestigeLearnSourceCodeSchedulePerformWorkUntilDeadlineRoute
-  prestigeLearnSourceCodeSchedulerIntroRoute: typeof prestigeLearnSourceCodeSchedulerIntroRoute
   prestigeLearnSourceCodeWorkLoopRoute: typeof prestigeLearnSourceCodeWorkLoopRoute
   prestigeLearnTheoryBrowserWorkRoute: typeof prestigeLearnTheoryBrowserWorkRoute
   prestigeLearnTheoryQueuesRoute: typeof prestigeLearnTheoryQueuesRoute
@@ -585,10 +602,11 @@ interface prestigeLearnLazyRouteChildren {
 
 const prestigeLearnLazyRouteChildren: prestigeLearnLazyRouteChildren = {
   prestigeLearnIntroductionRoute: prestigeLearnIntroductionRoute,
+  prestigeLearnOverviewRoute: prestigeLearnOverviewRoute,
   prestigeLearnPrerequisitesEventLoopRoute:
     prestigeLearnPrerequisitesEventLoopRoute,
-  prestigeLearnPrerequisitesMiniHeapRoute:
-    prestigeLearnPrerequisitesMiniHeapRoute,
+  prestigeLearnPrerequisitesMinHeapRoute:
+    prestigeLearnPrerequisitesMinHeapRoute,
   prestigeLearnPrerequisitesPrerequisitesRoute:
     prestigeLearnPrerequisitesPrerequisitesRoute,
   prestigeLearnSourceCodeFlushWorkRoute: prestigeLearnSourceCodeFlushWorkRoute,
@@ -600,8 +618,6 @@ const prestigeLearnLazyRouteChildren: prestigeLearnLazyRouteChildren = {
     prestigeLearnSourceCodeScheduleCallbackRoute,
   prestigeLearnSourceCodeSchedulePerformWorkUntilDeadlineRoute:
     prestigeLearnSourceCodeSchedulePerformWorkUntilDeadlineRoute,
-  prestigeLearnSourceCodeSchedulerIntroRoute:
-    prestigeLearnSourceCodeSchedulerIntroRoute,
   prestigeLearnSourceCodeWorkLoopRoute: prestigeLearnSourceCodeWorkLoopRoute,
   prestigeLearnTheoryBrowserWorkRoute: prestigeLearnTheoryBrowserWorkRoute,
   prestigeLearnTheoryQueuesRoute: prestigeLearnTheoryQueuesRoute,
@@ -615,6 +631,7 @@ const prestigeLearnLazyRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ShowcaseRoute: ShowcaseRoute,
   prestigeApiLazyRoute: prestigeApiLazyRouteWithChildren,
   prestigeLearnLazyRoute: prestigeLearnLazyRouteWithChildren,
 }

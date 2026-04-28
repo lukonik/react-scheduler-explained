@@ -1,0 +1,74 @@
+---
+title: Min Heap
+---
+
+# Min Heap
+
+:::note
+This is a simplified explanation of min-heaps, focused on the parts that matter for the Scheduler. For a deeper explanation, this [article](https://www.geeksforgeeks.org/dsa/introduction-to-min-heap-data-structure/) is a useful resource.
+:::
+
+A min-heap is a data structure that keeps the smallest item at the front.
+
+For Scheduler, that matters because it repeatedly needs to answer one question:
+
+> What is the next item I should look at?
+
+The important part is not that the whole queue is sorted. It is not. The important part is that the next item is always fast to read because it sits at the first position.
+
+That is exactly what Scheduler needs for a priority queue: cheap access to the next item, without paying the cost of fully sorting the queue after each change.
+
+## The Heap Rule
+
+A min-heap follows one main rule:
+
+> Every parent must be smaller than or equal to its children.
+
+That rule does not mean the whole array is fully sorted. It only guarantees that the smallest item is at the root.
+
+For example, this is a valid min-heap:
+
+```txt
+        1
+      /   \
+     4     2
+    / \   /
+   8   5 3
+```
+
+The smallest value, `1`, is at the top. The rest of the values are not fully sorted, but every parent is smaller than its children.
+
+## Why Heaps Are Stored in Arrays
+
+Heaps are often drawn as trees, but they are usually stored as arrays.
+
+The tree above can be stored like this:
+
+```txt
+[1, 4, 2, 8, 5, 3]
+```
+
+This is a compact and memory-efficient representation. There is no need to allocate separate tree nodes with pointers to children. The array itself is enough to preserve the heap structure.
+
+It also gives Scheduler the access pattern it cares about most: the first item is always available immediately. Reading the next item is just reading the front of the array.
+
+## The Key Operation Scheduler Needs
+
+The most important operation is checking the item at the front.
+
+Because the heap rule keeps the smallest item first, Scheduler can inspect the next relevant item in constant time.
+
+When an item is added or removed, the heap does a small amount of reordering to keep that first item correct. That is the whole trick: the structure maintains just enough order to make the next item cheap to find.
+
+## Why Scheduler Uses a Min-Heap
+
+Scheduler uses a min-heap because it behaves like an efficient priority queue.
+
+It gives Scheduler the behavior it needs:
+
+- read the next item quickly
+- insert items without fully sorting the queue
+- remove the next item while preserving the heap rule
+- store the queue compactly in an array
+
+This is why understanding a min-heap makes Scheduler easier to read. The queue code is not trying to keep every item in perfect order. It only keeps enough order to make the next item immediately available.

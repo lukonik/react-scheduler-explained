@@ -8,7 +8,7 @@ import {
   userBlockingPriorityTimeout,
 } from "./flags.ts";
 
-import { peek, pop, push } from "./mini-heap.ts";
+import { peek, pop, push } from "./min-heap.ts";
 
 declare var setImmediate: any;
 
@@ -496,5 +496,6 @@ export {
   scheduleCallback,
   shouldYieldToHost as shouldYield,
   UserBlockingPriority as UserBlockingPriority,
-  wrapCallback,
+  wrapCallback
 };
+

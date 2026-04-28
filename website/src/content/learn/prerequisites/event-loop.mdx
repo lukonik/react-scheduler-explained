@@ -58,10 +58,10 @@ However, this only delays the problem. At some point, `doHeavyComputation()` sti
 
 ## Why This Matters for Scheduler
 
-React Scheduler uses this behavior to split work into smaller chunks. Instead of running every scheduled callback in one long task, it performs work for a limited amount of time, yields back to the host environment, and schedules the remaining work for a later event cycle.
+This is the general idea Scheduler builds on: long work should be split into smaller chunks, and each chunk should give the browser a chance to regain control before the next one starts.
 
-That yield is what gives the browser a chance to handle user input, paint updates, and keep the page responsive.
+In practice, that means a system can run some work, stop, and continue the rest in a later task. That pause is what gives the browser a chance to handle user input, paint updates, and keep the page responsive.
 
-Scheduler can use different host APIs to schedule its next chunk of work. In this codebase, it prefers `setImmediate` when available, then `MessageChannel.postMessage`, and finally falls back to `setTimeout`. `MessageChannel` is preferred over `setTimeout` in browsers because zero-delay timers can be clamped, which makes them slower for repeatedly scheduling small chunks of work.
+Microtasks are not a good fit for this kind of yielding. Because microtasks run before rendering, continuing heavy work through `queueMicrotask` or resolved `Promise` handlers can still block paint. If the goal is to let the browser update the screen, the continuation needs to happen in a later task, not in the same cycle's microtask phase.
 
-Scheduler does not use `queueMicrotask` for this job because microtasks run before paint. If Scheduler kept continuing work through microtasks, it could prevent the browser from rendering, which defeats the purpose of yielding.
+The specific APIs used to schedule those later tasks are implementation details. The important mental model for now is simpler: yielding only helps when JavaScript actually stops long enough for the browser to do its own work.
