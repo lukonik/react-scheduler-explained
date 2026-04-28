@@ -11,9 +11,9 @@ export const Route = createFileRoute("/showcase")({
   ssr: false,
 });
 
-const TOTAL_SLICES = 140;
+const TOTAL_SLICES = 520;
 const SLICE_BUDGET_MS = 4;
-const PROGRESS_UPDATE_EVERY = 4;
+const PROGRESS_UPDATE_EVERY = 10;
 
 type RunMode = "scheduler" | "sync";
 type RunStatus = "idle" | "running" | "done";
