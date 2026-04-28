@@ -65,10 +65,6 @@ export default defineConfig({
           label: "Source Code",
           items: [
             {
-              label: "Scheduler Intro",
-              slug: "learn/source-code/scheduler-intro",
-            },
-            {
               label: "scheduleCallback",
               slug: "learn/source-code/scheduleCallback",
             },
