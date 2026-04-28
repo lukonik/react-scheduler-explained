@@ -4,20 +4,19 @@ title: "Overview"
 
 # Overview
 
-This project explains how React's internal Scheduler works by separating the idea from the full React codebase. Scheduler is one of the pieces that helps React keep interfaces responsive while rendering work is in progress.
+Welcome! This project explains React's internal Scheduler: the small, focused system that helps React decide **what work should run next**, **when that work is allowed to run**, and **when React should yield back to the browser**.
 
-At a high level, Scheduler is a cooperative task manager. React registers units of work, assigns them priorities, and lets Scheduler decide when each task should run. Scheduler can pause between chunks of work, give the browser a chance to handle input or paint, and then continue the remaining work later.
+You do not need to know Scheduler before starting here. The goal of this documentation is to build the idea gradually, from the browser event loop and min-heaps to the actual Scheduler source code.
 
-Scheduler does not make JavaScript run in parallel, and it cannot interrupt a function that is already executing. Its power comes from organizing work into small callbacks, choosing the next callback by priority and expiration time, and yielding at controlled points.
+In short, Scheduler is one of the pieces that makes React's concurrent rendering model practical. It does not magically pause JavaScript in the middle of a function. Instead, it runs work cooperatively: React breaks rendering into units, Scheduler runs those units in priority order, and the work can yield between chunks so the browser still has time to handle input and paint.
 
 ## How This Project Is Organized
 
-The project has two main parts:
+The project has three main parts:
 
-- **Learn** explains Scheduler conceptually and then walks through the source code step by step. This is the best place to start.
-- **API** documents the published package in this repository. After you understand the learning section, you can use the [API reference](/react-scheduler-explained/api/introduction) to explore the exported functions directly.
-
-There is also a [showcase](/react-scheduler-explained/showcase) that demonstrates Scheduler behavior in practice and compares scheduled work with ordinary synchronous function execution.
+- **Learn** is the main part of the project. It explains Scheduler conceptually first, then walks through the source code step by step so the implementation becomes easier to read.
+- **Published package** is a TypeScript, framework-agnostic copy of React Scheduler's core behavior. You can use it to experiment with priorities, delayed tasks, continuations, yielding, and cancellation. The [API reference](/react-scheduler-explained/api/introduction) covers the exported functions directly.
+- **Showcase** demonstrates Scheduler behavior in practice and compares scheduled work with ordinary synchronous function execution.
 
 ## Source Code Used Here
 
@@ -25,10 +24,20 @@ The original React Scheduler source lives in the React repository: [facebook/rea
 
 This project includes a focused copy of that implementation in the local [`src`](https://github.com/lukonik/react-scheduler-explained/tree/main/src) folder. The copy is based on React `19.2.4` and keeps the core scheduling behavior, including task queues, timer queues, priorities, host callbacks, and cooperative yielding.
 
-Some testing and debugging details have been removed so the learning path can stay focused. The goal is not to hide how Scheduler works, but to make the essential control flow easier to study.
+Some testing and debugging details have been removed so the learning path can stay focused.
 
-## Recommended Reading Path
+## How to Read the Learning Section
 
-Start with the Learn section. Read the prerequisite pages first if the event loop or min-heaps are unfamiliar, then move through the theory pages before opening the source-code walkthrough.
+Read the learning section from top to bottom. It is ordered intentionally:
 
-That order matters. Scheduler is easier to understand when you first know why React needs to yield, why tasks have expiration times, and why ready work and delayed work live in separate queues. Once those ideas are clear, the implementation becomes much easier to follow.
+- First, you build the prerequisite mental models.
+- Then, you learn the Scheduler concepts.
+- Finally, you read the source code with those concepts already in place.
+
+That order matters because the Scheduler code is not huge. The tricky part is how several small ideas interact: priorities, expiration times, task queues, delayed timers, host callbacks, and cooperative yielding.
+
+## AI Involvement
+
+English is not my primary language, so I use AI, primarily Codex, to polish the text. The prompt I use is available [here](https://github.com/lukonik/react-scheduler-explained/blob/main/AGENTS.md).
+
+My workflow is simple: I write the article first, then run `apply AGENTS.md to the article`. That's it.
