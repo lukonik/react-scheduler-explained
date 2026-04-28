@@ -20,6 +20,12 @@ const options: PrestigeShellProps = {
       Built with Prestige 🎩
     </a>
   ),
+  afterHeaderLinks: [
+    {
+      label: "Showcase",
+      to: "/showcase",
+    },
+  ],
 };
 
 export const Route = createRootRoute({
