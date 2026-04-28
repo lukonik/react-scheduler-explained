@@ -14,8 +14,8 @@ These pages explain the concepts first, without going too deep into implementati
 
 The Theory section is organized around the main pieces of Scheduler:
 
-- **Queues** explains how Scheduler stores ready tasks and delayed tasks, and why it uses min-heaps instead of ordinary arrays.
 - **Task** explains the task object, including `callback`, `priorityLevel`, `startTime`, `expirationTime`, and `sortIndex`.
+- **Queues** explains how Scheduler stores ready tasks and delayed tasks, and why it uses min-heaps instead of ordinary arrays.
 - **Browser Work** explains why Scheduler must yield to the browser and what "giving control back" actually means on the main thread.
 - **Scheduler** brings the pieces together and describes the full flow from scheduling a callback to running and continuing work.
 

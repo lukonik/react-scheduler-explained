@@ -44,12 +44,12 @@ export default defineConfig({
               slug: "learn/theory/theory",
             },
             {
-              label: "Queues",
-              slug: "learn/theory/queues",
-            },
-            {
               label: "Task",
               slug: "learn/theory/task",
+            },
+            {
+              label: "Queues",
+              slug: "learn/theory/queues",
             },
             {
               label: "Browser Work",
