@@ -6,7 +6,7 @@ export default defineConfig({
     label: "MIT",
     url: "https://opensource.org/licenses/MIT",
   },
-  github: "https://github.com/lukonik/prestige",
+  github: "https://github.com/lukonik/react-scheduler-explained",
   collections: [
     {
       id: "learn",
